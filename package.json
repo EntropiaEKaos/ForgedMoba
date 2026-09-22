@@ -6,7 +6,15 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "lint:sim-boundaries": "node scripts/check-simulation-boundaries.mjs",
+    "lint": "npm run lint:sim-boundaries && npm run typecheck",
+    "test": "npm run test:sim",
+    "test:sim": "node --test --experimental-strip-types src/simulation/*.test.ts",
+    "check": "npm run lint && npm run test:sim && npm run build",
+    "server:dev": "npm --prefix server run dev",
+    "server:typecheck": "npm --prefix server run typecheck"
   },
   "dependencies": {
     "clsx": "2.1.1",
