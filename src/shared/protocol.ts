@@ -60,6 +60,8 @@ export interface MatchFoundPayload {
   team: 0 | 1;
   slot: number;
   playerId: PlayerId;
+  contentVersion: string;
+  serverTickRate: number;
 }
 
 export interface InputEnvelope {
@@ -69,6 +71,7 @@ export interface InputEnvelope {
 
 export interface AuthoritativeSnapshot<TState = unknown> {
   matchId: string;
+  contentVersion: string;
   serverTick: number;
   ackSeqByPlayer: Record<PlayerId, number>;
   stateHash: string;

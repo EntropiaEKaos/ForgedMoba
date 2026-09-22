@@ -2,8 +2,10 @@ import type { EntityId, PlayerId } from '../shared/protocol.ts';
 
 export const SIM_TICK_RATE = 30;
 export const SIM_TICK_MS = 1000 / SIM_TICK_RATE;
+export const WAVE_INTERVAL_TICKS = SIM_TICK_RATE * 30;
 
 export type SimTeam = 0 | 1;
+export type SimEntityKind = 'hero' | 'minion' | 'tower';
 
 export interface SimVec {
   x: number;
@@ -12,13 +14,14 @@ export interface SimVec {
 
 export interface SimEntity {
   id: EntityId;
-  kind: 'hero';
+  kind: SimEntityKind;
   team: SimTeam;
-  ownerPlayerId: PlayerId;
+  ownerPlayerId: PlayerId | null;
   x: number;
   y: number;
   spawnX: number;
   spawnY: number;
+  radius: number;
   moveTarget: SimVec | null;
   attackTargetId: EntityId | null;
   hp: number;
@@ -29,12 +32,20 @@ export interface SimEntity {
   attackCooldownRemaining: number;
   moveSpeedPerTick: number;
   critChancePermille: number;
+  aggroRange: number;
   dead: boolean;
   respawnAtTick: number | null;
+  bountyGold: number;
+  xpBounty: number;
+  level: number;
+  xp: number;
+  gold: number;
+  cs: number;
 }
 
 export interface SimulationState {
-  version: 1;
+  version: 2;
+  contentVersion: string;
   tick: number;
   seed: number;
   rngState: number;
@@ -44,6 +55,10 @@ export interface SimulationState {
   entities: Record<string, SimEntity>;
   score: [number, number];
   lastAcceptedSeq: Record<PlayerId, number>;
+  laneEnabled: boolean;
+  nextWaveTick: number | null;
+  waveNumber: number;
+  winner: SimTeam | null;
 }
 
 export interface SimulationPlayerSeed {
@@ -55,7 +70,9 @@ export interface SimulationPlayerSeed {
 
 export interface CreateSimulationOptions {
   seed: number;
+  contentVersion?: string;
   width?: number;
   height?: number;
   players: SimulationPlayerSeed[];
+  withLane?: boolean;
 }

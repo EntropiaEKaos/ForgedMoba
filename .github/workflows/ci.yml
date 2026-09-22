@@ -6,6 +6,7 @@ on:
     branches:
       - main
       - 'foundation/**'
+      - 'simulation/**'
 
 permissions:
   contents: read
@@ -46,7 +47,7 @@ jobs:
         run: npm run build
 
   server-quality:
-    name: Server typecheck
+    name: Server typecheck + authoritative runner
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -66,3 +67,6 @@ jobs:
 
       - name: Server TypeScript
         run: npm run server:typecheck
+
+      - name: Authoritative runner tests
+        run: npm run server:test
