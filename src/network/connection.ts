@@ -1,10 +1,11 @@
 /**
  * Gerenciador de conexão online.
- * Mantém fallback offline, autenticação e matchmaking sem acumular listeners.
+ * Mantém fallback offline, autenticação, matchmaking e snapshots autoritativos.
  */
 import { useEffect, useState } from 'react';
 import { io, type Socket } from 'socket.io-client';
-import type { MatchFoundPayload } from '../shared/protocol.ts';
+import type { AuthoritativeSnapshot, MatchFoundPayload } from '../shared/protocol.ts';
+import type { SimulationState } from '../simulation/types.ts';
 
 export type ConnStatus = 'checking' | 'online' | 'offline';
 export type AuthMode = 'guest' | 'account';
@@ -30,13 +31,16 @@ class ConnectionManager {
   mode: AuthMode = 'guest';
   user: SessionUser | null = null;
   socket: Socket | null = null;
-  serverInfo: { version?: string; players?: number; activeMatches?: number } | null = null;
+  serverInfo: { version?: string; players?: number; activeMatches?: number; contentVersion?: string; tickRate?: number } | null = null;
   inQueue = false;
   queuePos: number | null = null;
   queueEta = 0;
   match: MatchFoundPayload | null = null;
   lastNetworkError: string | null = null;
+  authoritativeSnapshot: AuthoritativeSnapshot<SimulationState> | null = null;
 
+  private snapshotReceivedAt = 0;
+  private nextInputSeq = 1;
   private listeners = new Set<Listener>();
 
   constructor() {
@@ -65,13 +69,21 @@ class ConnectionManager {
     const ctrl = new AbortController();
     const timeout = setTimeout(() => ctrl.abort(), 2500);
     try {
-      const res = await fetch(API_URL + '/api/health', { signal: ctrl.signal });
+      const res = await fetch(`${API_URL}/api/health`, { signal: ctrl.signal });
       if (!res.ok) return false;
-      const data = await res.json() as { version?: string; players?: number; activeMatches?: number };
+      const data = await res.json() as {
+        version?: string;
+        players?: number;
+        activeMatches?: number;
+        contentVersion?: string;
+        tickRate?: number;
+      };
       this.serverInfo = {
         version: data.version,
         players: data.players,
         activeMatches: data.activeMatches,
+        contentVersion: data.contentVersion,
+        tickRate: data.tickRate,
       };
       return true;
     } catch {
@@ -104,11 +116,21 @@ class ConnectionManager {
   };
 
   private onQueueFound = (data: MatchFoundPayload) => {
-    if (!data?.matchId || (data.team !== 0 && data.team !== 1) || !Number.isInteger(data.slot)) return;
+    if (
+      !data?.matchId ||
+      (data.team !== 0 && data.team !== 1) ||
+      !Number.isInteger(data.slot) ||
+      !data.contentVersion ||
+      !Number.isFinite(data.serverTickRate) ||
+      data.serverTickRate <= 0
+    ) return;
     this.inQueue = false;
     this.queuePos = null;
     this.queueEta = 0;
     this.match = data;
+    this.authoritativeSnapshot = null;
+    this.snapshotReceivedAt = 0;
+    this.nextInputSeq = 1;
     this.emit();
     this.onMatchFound?.(data);
   };
@@ -131,12 +153,25 @@ class ConnectionManager {
     this.emit();
   };
 
+  private onGameSnapshot = (snapshot: AuthoritativeSnapshot<SimulationState>) => {
+    if (!this.match || snapshot?.matchId !== this.match.matchId) return;
+    if (snapshot.contentVersion !== this.match.contentVersion) {
+      this.lastNetworkError = 'content-version-mismatch';
+      this.emit();
+      return;
+    }
+    this.authoritativeSnapshot = snapshot;
+    this.snapshotReceivedAt = performance.now();
+    this.emit();
+  };
+
   private bindSocketEvents(socket: Socket) {
     socket.on('queue:joined', this.onQueueJoined);
     socket.on('queue:found', this.onQueueFound);
     socket.on('queue:left', this.onQueueLeft);
     socket.on('connect_error', this.onConnectError);
     socket.on('game:error', this.onGameError);
+    socket.on('game:snapshot', this.onGameSnapshot);
   }
 
   private unbindSocketEvents(socket: Socket) {
@@ -145,6 +180,7 @@ class ConnectionManager {
     socket.off('queue:left', this.onQueueLeft);
     socket.off('connect_error', this.onConnectError);
     socket.off('game:error', this.onGameError);
+    socket.off('game:snapshot', this.onGameSnapshot);
   }
 
   connectSocket(token?: string) {
@@ -180,6 +216,7 @@ class ConnectionManager {
     this.disconnectSocket();
     this.mode = 'guest';
     this.match = null;
+    this.authoritativeSnapshot = null;
     this.user = {
       id: 'guest',
       username: name || this.user?.username || 'Convidado',
@@ -192,7 +229,7 @@ class ConnectionManager {
   async login(username: string, password: string): Promise<{ ok: boolean; error?: string }> {
     if (this.status !== 'online') return { ok: false, error: 'Servidor offline. Jogue como convidado.' };
     try {
-      const res = await fetch(API_URL + '/api/auth/login', {
+      const res = await fetch(`${API_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),
@@ -214,7 +251,7 @@ class ConnectionManager {
   async register(username: string, email: string, password: string): Promise<{ ok: boolean; error?: string }> {
     if (this.status !== 'online') return { ok: false, error: 'Servidor offline. Jogue como convidado.' };
     try {
-      const res = await fetch(API_URL + '/api/auth/register', {
+      const res = await fetch(`${API_URL}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, email, password }),
@@ -238,6 +275,7 @@ class ConnectionManager {
     this.mode = 'account';
     this.user = user;
     this.match = null;
+    this.authoritativeSnapshot = null;
     localStorage.setItem(TOKEN_KEY, token);
     localStorage.setItem(USER_KEY, JSON.stringify(user));
     this.connectSocket(token);
@@ -251,6 +289,7 @@ class ConnectionManager {
     this.queuePos = null;
     this.queueEta = 0;
     this.match = null;
+    this.authoritativeSnapshot = null;
     this.enterGuest('Convidado');
   }
 
@@ -261,6 +300,7 @@ class ConnectionManager {
   joinQueue() {
     if (!this.isOnline || !this.socket || this.user?.mode !== 'account') return;
     this.match = null;
+    this.authoritativeSnapshot = null;
     this.lastNetworkError = null;
     this.inQueue = true;
     this.queuePos = 0;
@@ -279,7 +319,38 @@ class ConnectionManager {
 
   clearMatch() {
     this.match = null;
+    this.authoritativeSnapshot = null;
+    this.snapshotReceivedAt = 0;
     this.emit();
+  }
+
+  private estimatedServerTick(): number {
+    if (!this.match || !this.authoritativeSnapshot) return 0;
+    const elapsedMs = Math.max(0, performance.now() - this.snapshotReceivedAt);
+    return this.authoritativeSnapshot.serverTick + Math.floor(elapsedMs / (1000 / this.match.serverTickRate));
+  }
+
+  private emitGameCommand(command: Record<string, unknown>) {
+    if (!this.socket || !this.match || !this.user || this.user.mode !== 'account') return false;
+    const seq = this.nextInputSeq++;
+    const tick = this.estimatedServerTick();
+    this.socket.emit('game:input', {
+      matchId: this.match.matchId,
+      command: { ...command, playerId: this.user.id, seq, tick },
+    });
+    return true;
+  }
+
+  sendMove(x: number, y: number) {
+    return this.emitGameCommand({ type: 'move', x, y });
+  }
+
+  sendAttack(targetId: number) {
+    return this.emitGameCommand({ type: 'attack', targetId });
+  }
+
+  sendStop() {
+    return this.emitGameCommand({ type: 'stop' });
   }
 
   onMatchFound: ((match: MatchFoundPayload) => void) | null = null;
@@ -302,5 +373,6 @@ export function useConnection() {
     serverInfo: conn.serverInfo,
     match: conn.match,
     networkError: conn.lastNetworkError,
+    authoritativeSnapshot: conn.authoritativeSnapshot,
   };
 }
