@@ -1,21 +1,23 @@
-# ForgedMoba — Network Protocol Foundation
-
-This document describes the direction of the online protocol while the legacy game remains offline-authoritative.
+# ForgedMoba — Authoritative Network Protocol
 
 ## Trust model
 
-The server is the future source of truth. A client may request actions but may never author final combat/economy state.
+The server is the source of truth for online simulation. Clients send intent, never final gameplay state.
 
-Allowed client intent examples:
+Client intent currently accepted by the 0.2 vertical slice:
 
 - move,
 - attack target,
+- stop.
+
+Defined in the shared protocol but intentionally rejected until their authoritative runtimes exist:
+
 - cast ability,
 - buy item,
 - upgrade skill,
 - recall.
 
-Not trusted from clients:
+Never trusted from clients:
 
 - damage dealt,
 - HP after damage,
@@ -23,57 +25,72 @@ Not trusted from clients:
 - kill/death ownership,
 - cooldown completion,
 - objective death,
-- final world snapshot.
+- world snapshots.
+
+## Content identity
+
+Every match is bound to a deterministic `contentVersion` composed from an explicit semantic version and a canonical FNV-1a hash of the simulation rules manifest. Match-found payloads and authoritative snapshots carry the same value. A client reports `content-version-mismatch` instead of silently consuming a snapshot from a different rule package.
 
 ## Matchmaking
 
 When ten authenticated sockets are queued, the server:
 
-1. removes ten entries atomically from the in-memory queue,
-2. creates a match ID,
+1. removes ten entries from the queue,
+2. creates a match ID and deterministic seed,
 3. assigns team and slot,
-4. joins each socket to the Socket.IO room for that match,
-5. emits queue:found with matchId, team, slot and playerId.
+4. joins each socket to the Socket.IO room,
+5. creates a headless `MatchRunner`,
+6. emits `queue:found` with match ID, team, slot, player ID, content version and tick rate,
+7. emits the initial authoritative tick-0 snapshot,
+8. starts the 30 Hz match runner.
 
-The current server remains ephemeral: account and match metadata are lost on restart.
-
-## Socket authentication
-
-Socket.IO connection requires a JWT in handshake.auth.token. The server verifies it and resolves the associated in-memory user before accepting the socket.
-
-The development JWT fallback secret must never be used with NODE_ENV=production; production startup requires JWT_SECRET.
+Accounts and active-match metadata are still ephemeral in 0.2 and disappear on server restart.
 
 ## Input envelope
 
-Target fields:
+Each client command carries:
 
-- matchId
-- command.type
-- command.seq
-- command.tick
-- command-specific fields
+- matchId,
+- type,
+- seq,
+- tick,
+- command-specific fields.
 
-The server overwrites/attaches player identity from the authenticated socket; it does not trust a player ID supplied by the client.
+The authenticated socket identity overwrites client player identity. `MatchRunner` currently accepts only move/attack/stop, requires strictly increasing sequence numbers and accepts ticks only from the current server tick through current+6. Stale, duplicate and excessively future commands are rejected with protocol error codes.
 
-## State transport
+## Fixed-tick authority
 
-game:state sent by a client is rejected by the foundation server. When authoritative match runners are connected, only the server will emit authoritative snapshots/deltas.
+`MatchRunner` owns the authoritative `SimulationState` and advances it at 30 ticks/second. Wall-clock time schedules ticks but never participates in gameplay calculations. Gameplay time remains integer simulation ticks.
 
-Target snapshot metadata:
+Commands are queued by target tick, deterministically ordered in the simulation core, then applied to the state. Clients do not relay input authority to peers.
 
-- matchId
-- serverTick
-- ackSeqByPlayer
-- stateHash
-- state
+## Authoritative snapshots
+
+The 0.2 runner emits a snapshot every three simulation ticks (~10 Hz) and on terminal game state. A snapshot contains:
+
+- matchId,
+- contentVersion,
+- serverTick,
+- ackSeqByPlayer,
+- stateHash,
+- serializable simulation state.
+
+The browser stores the latest authoritative snapshot and estimates the current server tick only for command stamping. Prediction and reconciliation are deliberately deferred until the 0.4 client-network phase.
+
+## Security foundation
+
+Socket.IO requires a verified JWT. Development passwords use scrypt with random per-user salts. Client `game:state` messages are rejected. Payload sizes are bounded at transport level and auth endpoints have a small in-memory rate limiter.
+
+This is not yet a production identity system: persistent sessions, revocation, durable rate limiting, database constraints and operational secret management remain prerequisites.
 
 ## Next protocol gates
 
-- per-player monotonic input sequence validation server-side,
-- bounded future/past tick acceptance window,
-- authoritative simulation room runner,
-- snapshot delta encoding,
-- reconnect token and slot reclamation,
-- heartbeat/latency telemetry,
-- abuse limits per event type,
-- persistent account/session store.
+- online UI adapter consuming snapshots,
+- movement prediction and reconciliation,
+- remote interpolation,
+- reconnect token/slot reclamation,
+- ability/item command schemas with server validation,
+- per-event abuse budgets,
+- delta compression,
+- persistent account/session/match metadata,
+- command-log replay and spectator transport.
