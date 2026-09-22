@@ -1,0 +1,179 @@
+@import "tailwindcss";
+
+:root {
+  --gold: #e8c860;
+  --teal: #5ad0c0;
+}
+
+body {
+  background: #0b1412;
+  margin: 0;
+}
+
+.font-pixel { font-family: 'Press Start 2P', 'Courier New', monospace; }
+.font-body { font-family: 'VT323', 'Courier New', monospace; }
+
+.pixelated { image-rendering: pixelated; }
+
+/* fundo do rift: camadas de névoa + grade */
+.rift-bg {
+  background:
+    radial-gradient(1200px 600px at 15% -10%, rgba(90, 208, 192, 0.07), transparent 60%),
+    radial-gradient(1000px 700px at 90% 110%, rgba(232, 200, 96, 0.06), transparent 60%),
+    radial-gradient(700px 500px at 70% 20%, rgba(140, 90, 224, 0.05), transparent 60%),
+    #0b1412;
+  position: relative;
+}
+.rift-bg::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image:
+    linear-gradient(rgba(120, 200, 180, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(120, 200, 180, 0.035) 1px, transparent 1px);
+  background-size: 28px 28px;
+  pointer-events: none;
+  z-index: 0;
+}
+.rift-bg > * { position: relative; z-index: 1; }
+
+.grid-fade {
+  background-image:
+    linear-gradient(rgba(120, 200, 180, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(120, 200, 180, 0.08) 1px, transparent 1px);
+  background-size: 16px 16px;
+  mask-image: linear-gradient(to bottom, transparent, black 70%);
+}
+
+/* scanlines de CRT */
+.scanlines {
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0px, transparent 2px,
+    rgba(0, 0, 0, 0.13) 3px, rgba(0, 0, 0, 0.13) 3px
+  );
+  mix-blend-mode: multiply;
+}
+
+.pixel-panel {
+  border: 3px solid #2a3a42;
+  box-shadow: 6px 6px 0 rgba(0, 0, 0, 0.55);
+}
+.hard-shadow { box-shadow: 8px 8px 0 rgba(0, 0, 0, 0.6); }
+.hard-shadow-gold { box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.8); }
+
+.title-glow { text-shadow: 0 0 14px rgba(232, 200, 96, 0.55), 3px 3px 0 #000; }
+.title-glow-red { text-shadow: 0 0 14px rgba(255, 80, 80, 0.55), 3px 3px 0 #000; }
+
+@keyframes blink { 0%, 55% { opacity: 1; } 56%, 100% { opacity: 0; } }
+.animate-blink { animation: blink 1s steps(1) infinite; }
+
+@keyframes floaty { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
+.animate-float { animation: floaty 3s ease-in-out infinite; }
+
+@keyframes bannerIn {
+  0% { transform: translateX(-50%) scale(1.6); opacity: 0; }
+  55% { transform: translateX(-50%) scale(0.94); opacity: 1; }
+  100% { transform: translateX(-50%) scale(1); opacity: 1; }
+}
+.animate-banner { animation: bannerIn 0.35s cubic-bezier(.2, 1.4, .4, 1) both; }
+
+@keyframes popIn {
+  0% { transform: scale(1.5); opacity: 0; }
+  60% { transform: scale(0.95); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.animate-pop { animation: popIn 0.4s cubic-bezier(.2, 1.4, .4, 1) both; }
+
+@keyframes slidein {
+  from { transform: translateX(24px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+.animate-slidein { animation: slidein 0.25s ease-out both; }
+
+@keyframes readyPulse {
+  0%, 100% { box-shadow: 0 0 0 rgba(232, 200, 96, 0); }
+  50% { box-shadow: 0 0 10px rgba(232, 200, 96, 0.55); }
+}
+.ability-ready { animation: readyPulse 2s ease-in-out infinite; }
+
+@keyframes upgradablePulse {
+  0%, 100% { box-shadow: 0 0 0 rgba(64, 192, 96, 0); }
+  50% { box-shadow: 0 0 14px rgba(64, 192, 96, 0.7); }
+}
+.ability-upgradable { animation: upgradablePulse 1s ease-in-out infinite; }
+@keyframes skillPtGlow {
+  0%, 100% { box-shadow: 0 0 6px rgba(64, 192, 96, 0.4); }
+  50% { box-shadow: 0 0 14px rgba(64, 192, 96, 0.8); }
+}
+.skill-pt-glow { animation: skillPtGlow 1.2s ease-in-out infinite; }
+
+/* vignette sutil durante o jogo (bordas escuras imersivas) */
+.game-vignette {
+  box-shadow: inset 0 0 80px rgba(0,0,0,0.5), inset 0 0 180px rgba(0,0,0,0.25);
+  pointer-events: none;
+}
+
+/* hit-stop visual: tremor leve no canvas */
+@keyframes hitStop {
+  0%   { transform: translate(0, 0); }
+  15%  { transform: translate(-2px, 1px); }
+  30%  { transform: translate(2px, -1px); }
+  50%  { transform: translate(-1px, 0px); }
+  100% { transform: translate(0, 0); }
+}
+.hit-stop { animation: hitStop 0.08s ease-out; }
+
+/* brilho de aura de skin lendária */
+@keyframes skinAuraGlow {
+  0%, 100% { box-shadow: 0 0 0 0 var(--aura-color); }
+  50% { box-shadow: 0 0 12px 4px var(--aura-color); }
+}
+.skin-heavy-glow {
+  --aura-color: rgba(160, 96, 255, 0.6);
+  animation: skinAuraGlow 2s ease-in-out infinite;
+}
+
+/* flash de tela branca (respawn / morte) */
+@keyframes screenFlash {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
+}
+.screen-flash {
+  animation: screenFlash 0.3s ease-out forwards;
+  background: white;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 60;
+}
+
+/* shimmer no terreno (brilho sutil na água) */
+@keyframes waterShimmer {
+  0% { opacity: 0.15; }
+  50% { opacity: 0.35; }
+  100% { opacity: 0.15; }
+}
+.water-shimmer {
+  animation: waterShimmer 3s ease-in-out infinite;
+  background: radial-gradient(circle at 40% 50%, rgba(160,220,255,0.12), transparent 70%);
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* cursor customizado no jogo — mira dourada */
+.cursor-attack {
+  cursor: crosshair;
+}
+.cursor-aim {
+  cursor: crosshair;
+}
+
+/* dica de mira ativa — HUD sinal */
+@keyframes aimPulse {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.05); }
+}
+.aim-badge {
+  animation: aimPulse 0.6s ease-in-out infinite;
+}
