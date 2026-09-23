@@ -88,6 +88,7 @@ const SOCKET_EVENT_POLICIES = {
   draft: { capacity: 60, refillPerSecond: 20 },
   gameInput: { capacity: 180, refillPerSecond: 90 },
   gameLeave: { capacity: 4, refillPerSecond: 0.1 },
+  ping: { capacity: 10, refillPerSecond: 2 },
 } satisfies Record<string, EventRatePolicy>;
 
 const app = express();
@@ -480,6 +481,7 @@ io.use((socket, next) => {
 
 io.on('connection', (socket) => {
   const identity = socketIdentity(socket);
+  metrics.inc('forged_connections_total');
   const resumableDraft = draftForUser(identity.userId);
   if (resumableDraft) {
     const previousSocketId = resumableDraft.socketIdFor(identity.userId);
@@ -516,6 +518,7 @@ io.on('connection', (socket) => {
         }
         resumable.player.socketId = socket.id;
         identity.matchId = resumable.match.id;
+        metrics.inc('forged_reconnect_success_total', { mode: resumable.match.mode });
         socket.join(resumable.match.id);
         socket.emit('game:resumed', foundPayload(resumable.match, resumable.player));
         socket.emit('game:snapshot', resumable.match.runner.snapshot());
@@ -535,12 +538,14 @@ io.on('connection', (socket) => {
   }
 
   socket.on('net:ping', (_clientSentAt: unknown, ack?: () => void) => {
+    if (!allowSocketEvent(socket, 'net:ping', SOCKET_EVENT_POLICIES.ping, false)) return;
     if (typeof ack === 'function') ack();
   });
 
   console.log('[socket] conectado: ' + identity.username + ' (' + socket.id + ')');
 
   socket.on('queue:join', (payload?: { mode?: unknown; contentVersion?: unknown }) => {
+    if (!allowSocketEvent(socket, 'queue:join', SOCKET_EVENT_POLICIES.queue)) return;
     if (identity.matchId || identity.draftId) return;
     if (payload?.contentVersion !== CONTENT_VERSION) {
       socket.emit('game:error', { code: 'content-version-mismatch' });
@@ -581,11 +586,13 @@ io.on('connection', (socket) => {
   });
 
   socket.on('queue:leave', () => {
+    if (!allowSocketEvent(socket, 'queue:leave', SOCKET_EVENT_POLICIES.queue)) return;
     removeSocketFromQueue(socket.id);
     socket.emit('queue:left');
   });
 
   socket.on('draft:pick', (payload?: { draftId?: unknown; heroId?: unknown }) => {
+    if (!allowSocketEvent(socket, 'draft:pick', SOCKET_EVENT_POLICIES.draft)) return;
     const draftId = identity.draftId;
     const draft = draftId ? draftRooms.get(draftId) : undefined;
     if (
@@ -606,6 +613,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('draft:ready', (payload?: { draftId?: unknown; ready?: unknown }) => {
+    if (!allowSocketEvent(socket, 'draft:ready', SOCKET_EVENT_POLICIES.draft)) return;
     const draftId = identity.draftId;
     const draft = draftId ? draftRooms.get(draftId) : undefined;
     if (!draftId || payload?.draftId !== draftId || !draft || typeof payload.ready !== 'boolean') {
@@ -622,6 +630,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('draft:leave', (payload?: { draftId?: unknown }) => {
+    if (!allowSocketEvent(socket, 'draft:leave', SOCKET_EVENT_POLICIES.gameLeave)) return;
     const draftId = identity.draftId;
     if (!draftId || payload?.draftId !== draftId || !draftRooms.has(draftId)) {
       socket.emit('game:error', { code: 'invalid-draft-leave' });
@@ -631,20 +640,32 @@ io.on('connection', (socket) => {
   });
 
   socket.on('game:input', (payload: GameInputPayload) => {
+    if (!allowSocketEvent(socket, 'game:input', SOCKET_EVENT_POLICIES.gameInput)) return;
     const matchId = identity.matchId;
     const command = parsePlayerCommand(payload?.command, identity.userId);
     const match = matchId ? activeMatches.get(matchId) : undefined;
     if (!matchId || payload?.matchId !== matchId || !match || !command) {
+      metrics.inc('forged_commands_total', { result: 'rejected', code: 'invalid-input' });
       socket.emit('game:error', { code: 'invalid-input' });
       return;
     }
     const result = match.runner.enqueue(identity.userId, command);
-    if (!result.ok) socket.emit('game:error', { code: result.code });
+    if (result.ok) {
+      metrics.inc('forged_commands_total', { result: 'accepted', mode: match.mode, type: command.type });
+    } else {
+      metrics.inc('forged_commands_total', { result: 'rejected', mode: match.mode, code: result.code });
+      socket.emit('game:error', { code: result.code });
+    }
   });
 
-  socket.on('game:state', () => socket.emit('game:error', { code: 'client-state-rejected' }));
+  socket.on('game:state', () => {
+    if (!allowSocketEvent(socket, 'game:state', SOCKET_EVENT_POLICIES.gameInput)) return;
+    metrics.inc('forged_commands_total', { result: 'rejected', code: 'client-state-rejected' });
+    socket.emit('game:error', { code: 'client-state-rejected' });
+  });
 
   socket.on('game:leave', (payload?: { matchId?: unknown }) => {
+    if (!allowSocketEvent(socket, 'game:leave', SOCKET_EVENT_POLICIES.gameLeave)) return;
     const matchId = identity.matchId;
     const match = matchId ? activeMatches.get(matchId) : undefined;
     if (!matchId || payload?.matchId !== matchId || !match) {
@@ -655,6 +676,8 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
+    eventRateLimiter.clearPrefix(socket.id + ':');
+    metrics.inc('forged_disconnects_total');
     removeSocketFromQueue(socket.id);
     const draftId = identity.draftId;
     const draft = draftId ? draftRooms.get(draftId) : undefined;
