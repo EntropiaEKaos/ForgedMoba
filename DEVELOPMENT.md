@@ -27,7 +27,7 @@ The existing game is a feature-rich offline prototype. The migration strategy is
 - [x] reject client-authored game state.
 - [x] post-merge CI green on main.
 
-## Simulation / Lane Authority 0.2 — current branch
+## Simulation / Lane Authority 0.2 — certified and merged
 
 - [x] simulation state v2 with contentVersion.
 - [x] canonical content hash/version manifest.
@@ -42,17 +42,19 @@ The existing game is a feature-rich offline prototype. The migration strategy is
 - [x] snapshots every 3 ticks (10 Hz) with state hash and ackSeqByPlayer.
 - [x] server no longer relays client-authored game state or raw peer authority.
 - [x] client stores authoritative snapshots and can emit move/attack/stop commands.
-- [ ] GitHub branch CI + PR CI + post-merge CI must certify this phase before it is called merged.
+- [x] GitHub branch CI + PR CI + post-merge CI certified the merged phase.
 
-## Combat / Lane parity 0.3
+## Combat / Lane parity 0.3 — current branch
 
-- [ ] compatibility adapter from legacy player controls into authoritative commands.
-- [ ] deterministic collision resolution parity and nav/path constraints.
-- [ ] Q ability runtime for two original ForgedMoba test heroes.
-- [ ] deterministic buffs/cooldowns/status effects.
-- [ ] tower aggro parity and minion aggro rules.
-- [ ] XP sharing and economy parity beyond last-hit proof-of-concept.
-- [ ] command-log fixtures for reproduced bugs.
+- [x] client transport adapter for authoritative Q commands.
+- [x] deterministic unit separation and world-bound movement constraints.
+- [x] authoritative Q runtime for Gareth and Luxana.
+- [x] deterministic Q cooldowns plus slow/root status representation.
+- [x] tower provocation when an enemy hero damages an allied hero in range.
+- [x] deterministic lane XP sharing between nearby allied heroes.
+- [x] command-log fixture for reproduced combat scenarios.
+- [x] MatchRunner accepts Q while continuing to reject unsupported W/E/R authority.
+- [ ] branch CI + PR CI + post-merge CI certification.
 
 ## Network Client 0.4
 
