@@ -65,6 +65,7 @@ export interface MatchFoundPayload {
   playerId: PlayerId;
   contentVersion: string;
   serverTickRate: number;
+  reconnectGraceMs: number;
 }
 
 export interface InputEnvelope {
