@@ -1,12 +1,17 @@
 {
-  "name": "react-vite-tailwind",
+  "name": "forged-moba",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "lint": "node scripts/architecture-check.mjs",
+    "test:sim": "rm -rf .tmp-sim && tsc -p tsconfig.sim-test.json && node --test .tmp-sim/tests/simulation/*.test.js",
+    "test": "npm run test:sim",
+    "verify": "npm run typecheck && npm run lint && npm run test && npm run build"
   },
   "dependencies": {
     "clsx": "2.1.1",
