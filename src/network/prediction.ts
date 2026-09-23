@@ -1,5 +1,5 @@
 import type { AuthoritativeSnapshot, CoreSimulationCommand, PlayerId } from '../shared/protocol.ts';
-import { stepSimulation } from '../simulation/core.ts';
+import { stepOwnedPrediction } from '../simulation/core.ts';
 import type { SimEntity, SimulationState } from '../simulation/types.ts';
 
 function cloneState(state: SimulationState): SimulationState {
@@ -71,7 +71,7 @@ export class ClientPrediction {
 
     while (state.tick <= maxTick && state.winner === null) {
       const commands = this.pending.filter((command) => command.tick === state.tick);
-      stepSimulation(state, commands);
+      stepOwnedPrediction(state, this.playerId, commands);
     }
 
     this.lastPredicted = state;
