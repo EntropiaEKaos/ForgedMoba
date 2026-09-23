@@ -169,7 +169,10 @@ function createMatch(players: QueueEntry[], mode: MatchMode): ActiveMatch {
       if (completed) {
         for (const participant of completed.players) {
           const participantSocket = io.sockets.sockets.get(participant.socketId);
-          if (participantSocket) delete socketIdentity(participantSocket).matchId;
+          if (participantSocket) {
+            delete socketIdentity(participantSocket).matchId;
+            participantSocket.leave(id);
+          }
         }
       }
       activeMatches.delete(id);
@@ -263,6 +266,15 @@ io.on('connection', (socket) => {
   const identity = socketIdentity(socket);
   const resumable = matchForUser(identity.userId);
   if (resumable) {
+    const previousSocketId = resumable.player.socketId;
+    if (previousSocketId && previousSocketId !== socket.id) {
+      const previousSocket = io.sockets.sockets.get(previousSocketId);
+      if (previousSocket) {
+        delete socketIdentity(previousSocket).matchId;
+        previousSocket.emit('session:replaced');
+        previousSocket.disconnect(true);
+      }
+    }
     resumable.player.socketId = socket.id;
     identity.matchId = resumable.match.id;
     socket.join(resumable.match.id);
