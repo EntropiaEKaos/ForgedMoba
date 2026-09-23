@@ -5,6 +5,10 @@ import type {
   PlayerId,
 } from '../../src/shared/protocol.ts';
 import {
+  CURRENT_AUTHORITATIVE_CONTENT,
+  type PublishedAuthoritativeContent,
+} from '../../src/shared/authoritativeContent.ts';
+import {
   SIM_TICK_RATE,
   createSimulation,
   hashSimulationState,
@@ -34,6 +38,7 @@ export interface MatchRunnerOptions {
   seed: number;
   players: MatchRunnerPlayer[];
   snapshotEveryTicks?: number;
+  content?: PublishedAuthoritativeContent;
   onSnapshot?: (snapshot: AuthoritativeSnapshot<SimulationState>) => void;
   onComplete?: (state: SimulationState) => void;
 }
@@ -56,6 +61,10 @@ function normalizeCoreCommand(playerId: PlayerId, raw: PlayerCommand): CoreSimul
     return { type: 'attack', playerId, seq, tick, targetId };
   }
   if (raw.type === 'stop') return { type: 'stop', playerId, seq, tick };
+  if (raw.type === 'buy') {
+    if (typeof raw.itemId !== 'string' || raw.itemId.length === 0 || raw.itemId.length > 64) return null;
+    return { type: 'buy', playerId, seq, tick, itemId: raw.itemId };
+  }
   if (raw.type === 'cast') {
     if (raw.slot !== 'Q') return null;
     let targetId: number | undefined;
@@ -106,6 +115,7 @@ export class MatchRunner {
   readonly contentVersion: string;
   readonly snapshotEveryTicks: number;
 
+  private readonly content: PublishedAuthoritativeContent;
   private readonly playerIds: Set<PlayerId>;
   private readonly playerTeams = new Map<PlayerId, 0 | 1>();
   private readonly queued = new Map<number, CoreSimulationCommand[]>();
@@ -117,7 +127,14 @@ export class MatchRunner {
 
   constructor(options: MatchRunnerOptions) {
     this.matchId = options.matchId;
+    this.content = options.content ?? CURRENT_AUTHORITATIVE_CONTENT;
     this.contentVersion = options.contentVersion;
+    if (this.contentVersion !== this.content.contentVersion) {
+      throw new Error(
+        'MatchRunner content mismatch: expected ' + this.content.contentVersion +
+        ', received ' + this.contentVersion,
+      );
+    }
     this.snapshotEveryTicks = Math.max(1, Math.trunc(options.snapshotEveryTicks ?? 3));
     this.playerIds = new Set(options.players.map((player) => player.playerId));
     for (const player of options.players) this.playerTeams.set(player.playerId, player.team);
@@ -132,7 +149,7 @@ export class MatchRunner {
         team: player.team,
         ...spawnFor(player.team, player.slot),
       })),
-    });
+    }, this.content.payload);
     for (const player of options.players) this.lastQueuedSeq.set(player.playerId, -1);
   }
 
@@ -153,7 +170,7 @@ export class MatchRunner {
 
   enqueue(playerId: PlayerId, command: PlayerCommand): MatchInputResult {
     if (!this.playerIds.has(playerId)) return { ok: false, code: 'unknown-player' };
-    if (!['move', 'attack', 'stop', 'cast'].includes(command.type)) return { ok: false, code: 'unsupported-command' };
+    if (!['move', 'attack', 'stop', 'cast', 'buy'].includes(command.type)) return { ok: false, code: 'unsupported-command' };
     if (command.type === 'cast' && command.slot !== 'Q') return { ok: false, code: 'unsupported-command' };
     const normalized = normalizeCoreCommand(playerId, command);
     if (!normalized) return { ok: false, code: 'invalid-command' };
@@ -188,7 +205,7 @@ export class MatchRunner {
     const tick = this.state.tick;
     const commands = this.queued.get(tick) ?? [];
     this.queued.delete(tick);
-    stepSimulation(this.state, commands);
+    stepSimulation(this.state, commands, this.content.payload);
 
     if (this.state.winner !== null) {
       this.finish();
