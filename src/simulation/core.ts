@@ -613,7 +613,7 @@ function decrementCooldowns(entity: SimEntity): void {
 
 function resolveEntityCollisions(state: SimulationState): void {
   const entities = Object.values(state.entities)
-    .filter((entity) => !entity.dead && entity.kind !== 'tower')
+    .filter((entity) => !entity.dead && entity.kind !== 'tower' && entity.kind !== 'ward')
     .sort((a, b) => a.id - b.id);
 
   for (let i = 0; i < entities.length; i += 1) {
