@@ -58,8 +58,12 @@ function normalizeCoreCommand(playerId: PlayerId, raw: PlayerCommand): CoreSimul
   if (raw.type === 'stop') return { type: 'stop', playerId, seq, tick };
   if (raw.type === 'cast') {
     if (raw.slot !== 'Q') return null;
-    const targetId = raw.targetId === undefined ? undefined : finiteInt(raw.targetId);
-    if (raw.targetId !== undefined && (targetId === null || targetId <= 0)) return null;
+    let targetId: number | undefined;
+    if (raw.targetId !== undefined) {
+      const parsedTargetId = finiteInt(raw.targetId);
+      if (parsedTargetId === null || parsedTargetId <= 0) return null;
+      targetId = parsedTargetId;
+    }
     if (raw.x !== undefined && !Number.isFinite(raw.x)) return null;
     if (raw.y !== undefined && !Number.isFinite(raw.y)) return null;
     return {
