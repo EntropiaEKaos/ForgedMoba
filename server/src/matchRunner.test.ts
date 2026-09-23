@@ -171,3 +171,21 @@ test('runner enables published jungle and accepts authoritative ward commands', 
   assert.ok(ward);
   assert.equal(ward.ownerPlayerId, 'blue-1');
 });
+
+
+test('MatchRunner preserves authoritative hero picks from ranked draft players', () => {
+  const runner = new MatchRunner({
+    matchId: 'draft-hero-picks',
+    contentVersion: CURRENT_AUTHORITATIVE_CONTENT.contentVersion,
+    content: CURRENT_AUTHORITATIVE_CONTENT,
+    seed: stableSeedFromMatchId('draft-hero-picks'),
+    players: [
+      { playerId: 'blue-1', team: 0, slot: 0, heroId: 'luxana' },
+      { playerId: 'red-1', team: 1, slot: 0, heroId: 'gareth' },
+    ],
+  });
+  const blue = Object.values(runner.state.entities).find((entity) => entity.ownerPlayerId === 'blue-1');
+  const red = Object.values(runner.state.entities).find((entity) => entity.ownerPlayerId === 'red-1');
+  assert.equal(blue?.heroId, 'luxana');
+  assert.equal(red?.heroId, 'gareth');
+});
