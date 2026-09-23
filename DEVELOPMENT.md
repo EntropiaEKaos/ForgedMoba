@@ -95,7 +95,7 @@ The existing game is a feature-rich offline prototype. The migration strategy is
 - [x] unit tests cover reconnect expiry/cancel/cleanup and exact 3v3 matchmaking.
 - [x] branch CI + PR CI + post-merge main CI green on main @ 412d8b0b0b381591b240684c1ed28264c3b2f4c0.
 
-## Authoritative Content 0.7 — current branch
+## Authoritative Content 0.7 — certified and merged
 
 - [x] validated authoritative content schema with deterministic publication hash.
 - [x] immutable published pack separated from browser-local Admin drafts.
@@ -109,10 +109,23 @@ The existing game is a feature-rich offline prototype. The migration strategy is
 - [x] `/api/content/current` exposes the active published pack/manifest.
 - [x] Admin panel clearly distinguishes local drafts from published online authority.
 - [x] tests prove gameplay changes alter the content hash and published packs are immutable.
+- [x] branch CI + PR CI + post-merge main CI green on main @ 2e467044df2e956d3a1cacb1aa8b99f29766c7da.
+
+## Simulation / Map Authority 0.8 — current branch
+
+- [x] published jungle camps/objective rules are content-hash bound.
+- [x] neutral camps and epic objective spawn inside the deterministic simulation.
+- [x] neutral AI uses the existing spatial/attack pipeline with leash behavior.
+- [x] camp and objective respawn timing is server-authoritative.
+- [x] jungle rewards, team objective gold and objective score are server-owned.
+- [x] `place-ward` is an authoritative command with range/cooldown/team cap.
+- [x] ward duration and team vision radius are deterministic state.
+- [x] local prediction/reconciliation supports ward placement.
+- [x] online diagnostics render jungle entities, objective score and ward cooldown.
+- [x] tests cover jungle/objective/ward determinism, rewards, visibility and transport.
 - [ ] branch CI + PR CI + post-merge main CI certification.
 
 ## Multiplayer milestones
-- [ ] 0.8: jungle/objectives/wards under server authority.
 - [ ] 0.9: full draft/lobby and 5v5 load testing.
 - [ ] 1.0: production-ready authoritative 5v5 match architecture.
 
