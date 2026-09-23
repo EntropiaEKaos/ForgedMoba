@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { AuthoritativeSnapshot } from '../shared/protocol.ts';
 import { createSimulation, stepSimulation } from '../simulation/core.ts';
+import { createClientViewState } from '../simulation/visibility.ts';
 import type { SimulationState } from '../simulation/types.ts';
 import { SnapshotInterpolationBuffer } from './interpolation.ts';
 import { ClientPrediction } from './prediction.ts';
@@ -143,4 +144,77 @@ test('prediction replays ward placement and reconciles the authoritative ward en
     Object.values(reconciled?.entities ?? {}).filter((entity) => entity.kind === 'ward').length,
     1,
   );
+});
+
+
+test('owned-state prediction remains responsive on a fog-redacted snapshot', () => {
+  const full = createSimulation({
+    seed: 456,
+    contentVersion: 'network-fog-test',
+    players: [
+      { playerId: 'blue', team: 0, x: 700, y: 1000, heroId: 'gareth' },
+      { playerId: 'red', team: 1, x: 2300, y: 1000, heroId: 'luxana' },
+    ],
+  });
+  const view = createClientViewState(full, 'blue');
+  assert.equal(Object.values(view.entities).some((entity) => entity.ownerPlayerId === 'red'), false);
+  assert.equal(view.rngState, 0);
+
+  const prediction = new ClientPrediction('blue');
+  prediction.acceptSnapshot({
+    matchId: 'fog-match',
+    contentVersion: view.contentVersion,
+    serverTick: view.tick,
+    ackSeqByPlayer: { blue: -1 },
+    stateHash: 'viewhash',
+    state: view,
+  });
+
+  prediction.record({
+    type: 'move',
+    playerId: 'blue',
+    seq: 1,
+    tick: 0,
+    x: 900,
+    y: 1000,
+  });
+  const predicted = prediction.predictThrough(0);
+  const local = Object.values(predicted?.entities ?? {}).find((entity) => entity.ownerPlayerId === 'blue');
+  assert.ok(local);
+  assert.ok(local.x > 700);
+  assert.equal(Object.values(predicted?.entities ?? {}).some((entity) => entity.ownerPlayerId === 'red'), false);
+});
+
+test('ward prediction on a redacted view does not require hidden entity IDs or RNG', () => {
+  const full = createSimulation({
+    seed: 789,
+    contentVersion: 'network-fog-ward',
+    players: [
+      { playerId: 'blue', team: 0, x: 700, y: 1000, heroId: 'gareth' },
+      { playerId: 'red', team: 1, x: 2300, y: 1000, heroId: 'luxana' },
+    ],
+  });
+  const view = createClientViewState(full, 'blue');
+  const prediction = new ClientPrediction('blue');
+  prediction.acceptSnapshot({
+    matchId: 'fog-ward-match',
+    contentVersion: view.contentVersion,
+    serverTick: view.tick,
+    ackSeqByPlayer: { blue: -1 },
+    stateHash: 'viewhash',
+    state: view,
+  });
+  prediction.record({
+    type: 'place-ward',
+    playerId: 'blue',
+    seq: 1,
+    tick: 0,
+    x: 1000,
+    y: 1000,
+  });
+
+  const predicted = prediction.predictThrough(0);
+  const ward = Object.values(predicted?.entities ?? {}).find((entity) => entity.kind === 'ward');
+  assert.ok(ward);
+  assert.ok(ward.id >= 1_000_000_000);
 });
