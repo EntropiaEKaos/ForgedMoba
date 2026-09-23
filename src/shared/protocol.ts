@@ -1,6 +1,28 @@
 export type PlayerId = string;
 export type EntityId = number;
 export type MatchMode = 'duel1v1' | 'skirmish3v3' | 'ranked5v5';
+export type RankedRole = 'top' | 'jungle' | 'mid' | 'carry' | 'support';
+export type DraftStatus = 'draft' | 'ready' | 'cancelled' | 'launched';
+
+export interface DraftPlayerSnapshot {
+  playerId: PlayerId;
+  username: string;
+  team: 0 | 1;
+  slot: number;
+  role: RankedRole;
+  heroId: string | null;
+  ready: boolean;
+  connected: boolean;
+}
+
+export interface DraftStatePayload {
+  draftId: string;
+  mode: 'ranked5v5';
+  contentVersion: string;
+  status: DraftStatus;
+  deadlineAt: number;
+  players: DraftPlayerSnapshot[];
+}
 
 export interface CommandBase {
   playerId: PlayerId;
