@@ -324,6 +324,16 @@ io.on('connection', (socket) => {
 
   socket.on('game:state', () => socket.emit('game:error', { code: 'client-state-rejected' }));
 
+  socket.on('game:leave', (payload?: { matchId?: unknown }) => {
+    const matchId = identity.matchId;
+    const match = matchId ? activeMatches.get(matchId) : undefined;
+    if (!matchId || payload?.matchId !== matchId || !match) {
+      socket.emit('game:error', { code: 'invalid-leave' });
+      return;
+    }
+    match.runner.forfeit(identity.userId);
+  });
+
   socket.on('disconnect', () => {
     removeSocketFromQueue(socket.id);
     const matchId = identity.matchId;
