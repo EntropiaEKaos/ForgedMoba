@@ -54,6 +54,7 @@ export type PlayerCommand =
   | RecallCommand;
 
 export type CoreMovementCommand = MoveCommand | AttackCommand | StopCommand;
+export type CoreSimulationCommand = CoreMovementCommand | CastCommand;
 
 export interface MatchFoundPayload {
   matchId: string;
