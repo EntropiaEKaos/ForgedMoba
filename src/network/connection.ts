@@ -30,6 +30,8 @@ const TOKEN_KEY = 'pixelrift_token';
 const USER_KEY = 'pixelrift_user';
 
 type Listener = () => void;
+type StripCommandEnvelope<T> = T extends unknown ? Omit<T, 'playerId' | 'seq' | 'tick'> : never;
+type LocalSimulationCommand = StripCommandEnvelope<CoreSimulationCommand>;
 type QueueJoinedPayload = { position: number; estimatedTime: number };
 type GameErrorPayload = { code?: string };
 
@@ -406,7 +408,7 @@ class ConnectionManager {
       Math.floor((elapsedMs + halfRtt) / (1000 / this.match.serverTickRate));
   }
 
-  private emitGameCommand(command: Omit<CoreSimulationCommand, 'playerId' | 'seq' | 'tick'>) {
+  private emitGameCommand(command: LocalSimulationCommand) {
     if (!this.socket || !this.match || !this.user || this.user.mode !== 'account') return false;
     const seq = this.nextInputSeq++;
     const tick = this.estimatedServerTick();
