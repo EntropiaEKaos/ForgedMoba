@@ -125,7 +125,7 @@ The existing game is a feature-rich offline prototype. The migration strategy is
 - [x] tests cover jungle/objective/ward determinism, rewards, visibility and transport.
 - [x] branch CI + PR CI + post-merge main CI green on main @ d6cccf4af9375a7b6fea161cd2538aae88325fab.
 
-## Multiplayer 0.9 — current branch
+## Multiplayer 0.9 — certified and merged
 
 - [x] Ranked 5v5 queue enters an authoritative pre-match draft room instead of launching immediately.
 - [x] stable TOP/JUNGLE/MID/CARRY/SUPPORT slot assignment per team.
@@ -139,6 +139,21 @@ The existing game is a feature-rich offline prototype. The migration strategy is
 - [x] repeatable concurrent 5v5 load probe with command pressure and final state hashes.
 - [x] CI load gate runs 50 concurrent 5v5 matches for 900 ticks each with 10 Hz authoritative snapshot hashing/cloning.
 - [x] load harness verifies repeatable final hashes across identical concurrent runs.
+- [x] branch CI + PR CI + post-merge main CI green on main @ c33c812601cdf72f44a1e1e99c7b64a074e23a45.
+
+## Production Architecture 1.0 — current branch
+
+- [x] per-event Socket.IO token-bucket budgets for queue/draft/gameplay abuse control.
+- [x] Prometheus-compatible operational metrics with optional bearer protection.
+- [x] applied-command replay log bound to match seed, roster and content version.
+- [x] deterministic replay verifier reproduces the final authoritative state hash.
+- [x] explicit terminal replay event for server-authoritative forfeits.
+- [x] pluggable replay archive with memory fallback and atomic file persistence.
+- [x] completed matches archive replay records without blocking match completion.
+- [x] production branch CI coverage.
+- [ ] durable account/session store replacing in-memory identity.
+- [ ] client-safe fog-of-war snapshot redaction after prediction is decoupled from full world state.
+- [ ] soak/network load gate with real Socket.IO traffic and reconnect churn.
 - [ ] branch CI + PR CI + post-merge main CI certification.
 
 ## Multiplayer milestones
