@@ -25,7 +25,7 @@ export class MatchmakingQueues {
   };
 
   join(entry: MatchmakingEntry, mode: MatchMode): MatchmakingJoinResult {
-    const existing = this.findBySocket(entry.socketId);
+    const existing = this.findBySocket(entry.socketId) ?? this.findByUser(entry.userId);
     if (existing) {
       return {
         joined: false,
@@ -70,6 +70,14 @@ export class MatchmakingQueues {
 
   requiredPlayers(mode: MatchMode): number {
     return REQUIRED[mode];
+  }
+
+  private findByUser(userId: string): { mode: MatchMode; position: number } | null {
+    for (const mode of ['duel1v1', 'ranked5v5'] as const) {
+      const position = this.queues[mode].findIndex((entry) => entry.userId === userId);
+      if (position >= 0) return { mode, position: position + 1 };
+    }
+    return null;
   }
 
   private findBySocket(socketId: string): { mode: MatchMode; position: number } | null {
