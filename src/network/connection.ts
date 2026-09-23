@@ -7,6 +7,7 @@ import { io, type Socket } from 'socket.io-client';
 import type {
   AuthoritativeSnapshot,
   CoreSimulationCommand,
+  DraftStatePayload,
   MatchFoundPayload,
   MatchMode,
 } from '../shared/protocol.ts';
@@ -56,12 +57,15 @@ class ConnectionManager {
     tickRate?: number;
     skirmishQueueSize?: number;
     reconnectGraceMs?: number;
+    rankedDraftTimeoutMs?: number;
+    activeDrafts?: number;
   } | null = null;
   inQueue = false;
   queuePos: number | null = null;
   queueEta = 0;
   queueMode: MatchMode | null = null;
   queueRequiredPlayers = 0;
+  draft: DraftStatePayload | null = null;
   match: MatchFoundPayload | null = null;
   matchResult: { winner: 0 | 1 | null } | null = null;
   lastNetworkError: string | null = null;
@@ -114,6 +118,8 @@ class ConnectionManager {
         tickRate?: number;
         skirmishQueueSize?: number;
         reconnectGraceMs?: number;
+        rankedDraftTimeoutMs?: number;
+        activeDrafts?: number;
       };
       this.serverInfo = {
         version: data.version,
@@ -123,6 +129,8 @@ class ConnectionManager {
         tickRate: data.tickRate,
         skirmishQueueSize: data.skirmishQueueSize,
         reconnectGraceMs: data.reconnectGraceMs,
+        rankedDraftTimeoutMs: data.rankedDraftTimeoutMs,
+        activeDrafts: data.activeDrafts,
       };
       if (data.contentVersion && data.contentVersion !== LOCAL_CONTENT_VERSION) {
         this.lastNetworkError = 'content-version-mismatch';
@@ -159,6 +167,40 @@ class ConnectionManager {
     this.emit();
   };
 
+  private applyDraftState(data: DraftStatePayload) {
+    if (
+      !data?.draftId ||
+      data.mode !== 'ranked5v5' ||
+      data.contentVersion !== LOCAL_CONTENT_VERSION ||
+      !Number.isFinite(data.deadlineAt) ||
+      !Array.isArray(data.players) ||
+      data.players.length !== 10
+    ) return;
+    this.inQueue = false;
+    this.queuePos = null;
+    this.queueEta = 0;
+    this.queueMode = null;
+    this.queueRequiredPlayers = 0;
+    this.draft = data;
+    this.lastNetworkError = null;
+    this.emit();
+  }
+
+  private onDraftFound = (data: DraftStatePayload) => {
+    this.applyDraftState(data);
+  };
+
+  private onDraftState = (data: DraftStatePayload) => {
+    this.applyDraftState(data);
+  };
+
+  private onDraftCancelled = (payload: { draftId?: string; code?: string }) => {
+    if (!this.draft || payload?.draftId !== this.draft.draftId) return;
+    this.draft = null;
+    this.lastNetworkError = payload.code || 'draft-cancelled';
+    this.emit();
+  };
+
   private onQueueFound = (data: MatchFoundPayload) => {
     if (
       !data?.matchId ||
@@ -176,6 +218,7 @@ class ConnectionManager {
     this.queueEta = 0;
     this.queueMode = null;
     this.queueRequiredPlayers = 0;
+    this.draft = null;
     this.match = data;
     this.matchResult = null;
     this.disconnectedPlayers = {};
@@ -279,6 +322,7 @@ class ConnectionManager {
 
   private onSessionReplaced = () => {
     this.lastNetworkError = 'session-replaced-by-newer-connection';
+    this.draft = null;
     this.match = null;
     this.matchResult = null;
     this.resetNetworkMatchState();
@@ -291,6 +335,9 @@ class ConnectionManager {
     socket.on('queue:joined', this.onQueueJoined);
     socket.on('queue:found', this.onQueueFound);
     socket.on('queue:left', this.onQueueLeft);
+    socket.on('draft:found', this.onDraftFound);
+    socket.on('draft:state', this.onDraftState);
+    socket.on('draft:cancelled', this.onDraftCancelled);
     socket.on('connect_error', this.onConnectError);
     socket.on('game:error', this.onGameError);
     socket.on('game:snapshot', this.onGameSnapshot);
@@ -307,6 +354,9 @@ class ConnectionManager {
     socket.off('queue:joined', this.onQueueJoined);
     socket.off('queue:found', this.onQueueFound);
     socket.off('queue:left', this.onQueueLeft);
+    socket.off('draft:found', this.onDraftFound);
+    socket.off('draft:state', this.onDraftState);
+    socket.off('draft:cancelled', this.onDraftCancelled);
     socket.off('connect_error', this.onConnectError);
     socket.off('game:error', this.onGameError);
     socket.off('game:snapshot', this.onGameSnapshot);
@@ -381,6 +431,7 @@ class ConnectionManager {
   enterGuest(name?: string) {
     this.disconnectSocket();
     this.mode = 'guest';
+    this.draft = null;
     this.match = null;
     this.matchResult = null;
     this.resetNetworkMatchState();
@@ -441,6 +492,7 @@ class ConnectionManager {
     this.disconnectSocket();
     this.mode = 'account';
     this.user = user;
+    this.draft = null;
     this.match = null;
     this.matchResult = null;
     this.resetNetworkMatchState();
@@ -458,6 +510,7 @@ class ConnectionManager {
     this.queueEta = 0;
     this.queueMode = null;
     this.queueRequiredPlayers = 0;
+    this.draft = null;
     this.match = null;
     this.matchResult = null;
     this.resetNetworkMatchState();
@@ -475,6 +528,7 @@ class ConnectionManager {
       this.emit();
       return;
     }
+    this.draft = null;
     this.match = null;
     this.matchResult = null;
     this.resetNetworkMatchState();
@@ -498,6 +552,27 @@ class ConnectionManager {
     this.emit();
   }
 
+  pickDraftHero(heroId: string) {
+    if (!this.socket || !this.draft || this.draft.status !== 'draft') return false;
+    this.socket.emit('draft:pick', { draftId: this.draft.draftId, heroId });
+    return true;
+  }
+
+  setDraftReady(ready: boolean) {
+    if (!this.socket || !this.draft || this.draft.status !== 'draft') return false;
+    this.socket.emit('draft:ready', { draftId: this.draft.draftId, ready });
+    return true;
+  }
+
+  leaveDraft() {
+    if (!this.socket || !this.draft) {
+      this.draft = null;
+      this.emit();
+      return;
+    }
+    this.socket.emit('draft:leave', { draftId: this.draft.draftId });
+  }
+
   leaveMatch() {
     if (!this.socket || !this.match) {
       this.clearMatch();
@@ -507,6 +582,7 @@ class ConnectionManager {
   }
 
   clearMatch() {
+    this.draft = null;
     this.match = null;
     this.matchResult = null;
     this.resetNetworkMatchState();
@@ -599,6 +675,7 @@ export function useConnection() {
     status: conn.status,
     user: conn.user,
     serverInfo: conn.serverInfo,
+    draft: conn.draft,
     match: conn.match,
     matchResult: conn.matchResult,
     networkError: conn.lastNetworkError,

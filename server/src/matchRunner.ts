@@ -6,6 +6,7 @@ import type {
 } from '../../src/shared/protocol.ts';
 import {
   CURRENT_AUTHORITATIVE_CONTENT,
+  type AuthoritativeHeroId,
   type PublishedAuthoritativeContent,
 } from '../../src/shared/authoritativeContent.ts';
 import {
@@ -30,6 +31,7 @@ export interface MatchRunnerPlayer {
   playerId: PlayerId;
   team: 0 | 1;
   slot: number;
+  heroId?: AuthoritativeHeroId;
 }
 
 export interface MatchRunnerOptions {
@@ -159,6 +161,7 @@ export class MatchRunner {
       players: options.players.map((player) => ({
         playerId: player.playerId,
         team: player.team,
+        heroId: player.heroId,
         ...spawnFor(player.team, player.slot),
       })),
     }, this.content.payload);

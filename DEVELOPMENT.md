@@ -111,7 +111,7 @@ The existing game is a feature-rich offline prototype. The migration strategy is
 - [x] tests prove gameplay changes alter the content hash and published packs are immutable.
 - [x] branch CI + PR CI + post-merge main CI green on main @ 2e467044df2e956d3a1cacb1aa8b99f29766c7da.
 
-## Simulation / Map Authority 0.8 — current branch
+## Simulation / Map Authority 0.8 — certified and merged
 
 - [x] published jungle camps/objective rules are content-hash bound.
 - [x] neutral camps and epic objective spawn inside the deterministic simulation.
@@ -123,10 +123,25 @@ The existing game is a feature-rich offline prototype. The migration strategy is
 - [x] local prediction/reconciliation supports ward placement.
 - [x] online diagnostics render jungle entities, objective score and ward cooldown.
 - [x] tests cover jungle/objective/ward determinism, rewards, visibility and transport.
+- [x] branch CI + PR CI + post-merge main CI green on main @ d6cccf4af9375a7b6fea161cd2538aae88325fab.
+
+## Multiplayer 0.9 — current branch
+
+- [x] Ranked 5v5 queue enters an authoritative pre-match draft room instead of launching immediately.
+- [x] stable TOP/JUNGLE/MID/CARRY/SUPPORT slot assignment per team.
+- [x] hero picks validated against the active published authoritative content.
+- [x] player ready-lock required before match launch.
+- [x] all 10 players must be connected, picked and ready before MatchRunner creation.
+- [x] draft reconnect replaces the socket while preserving slot/pick/ready state.
+- [x] two-minute draft deadline with server-owned cancellation.
+- [x] authoritative React draft screen driven only by server snapshots.
+- [x] selected draft hero IDs are passed into MatchRunner and verified by tests.
+- [x] repeatable concurrent 5v5 load probe with command pressure and final state hashes.
+- [x] CI load gate runs 50 concurrent 5v5 matches for 900 ticks each with 10 Hz authoritative snapshot hashing/cloning.
+- [x] load harness verifies repeatable final hashes across identical concurrent runs.
 - [ ] branch CI + PR CI + post-merge main CI certification.
 
 ## Multiplayer milestones
-- [ ] 0.9: full draft/lobby and 5v5 load testing.
 - [ ] 1.0: production-ready authoritative 5v5 match architecture.
 
 ## Post-1.0 platform

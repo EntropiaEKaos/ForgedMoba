@@ -1,6 +1,6 @@
 {
   "name": "pixel-rift-server",
-  "version": "2.6.0",
+  "version": "2.7.0",
   "description": "ForgedMoba online foundation — authoritative lane runner, matchmaking and auth",
   "type": "module",
   "main": "src/index.ts",
@@ -8,7 +8,9 @@
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
     "typecheck": "tsc --noEmit",
-    "test": "node --test --experimental-strip-types src/*.test.ts"
+    "test": "node --test --experimental-strip-types src/*.test.ts",
+    "load:5v5:smoke": "node --experimental-strip-types src/loadProbe.cli.ts --matches=16 --ticks=300 --command-every=15",
+    "load:5v5": "node --experimental-strip-types src/loadProbe.cli.ts --matches=50 --ticks=900 --command-every=15"
   },
   "dependencies": {
     "express": "^4.18.2",

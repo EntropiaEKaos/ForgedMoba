@@ -13,6 +13,7 @@ import { DraftScreen } from './screens/DraftScreen';
 import { AdminPanel } from './admin/AdminPanel';
 import { RunesModal } from './screens/RunesModal';
 import { OnlineMatchScreen } from './screens/OnlineMatchScreen';
+import { RankedDraftScreen } from './screens/RankedDraftScreen';
 import { getActiveRules, initializeAdminContent, type AdminContent } from './admin/content';
 
 // ================= BADGE DE STATUS ONLINE =================
@@ -518,9 +519,9 @@ function MultiplayerLobby({ onPlay }: { onPlay: () => void }) {
 
         <div className="pixel-panel bg-[#101820] p-5 text-center">
           <div className="text-4xl mb-2">🏰</div>
-          <h2 className="font-pixel text-[11px] text-[#5ad0c0] mb-2">RANQUEADA 5V5 — FUNDAÇÃO</h2>
+          <h2 className="font-pixel text-[11px] text-[#5ad0c0] mb-2">RANQUEADA 5V5 · DRAFT</h2>
           <p className="text-[14px] text-[#9ab0b8] min-h-16">
-            Preserva a fila de 10 jogadores para a evolução do MOBA completo; ainda usa o slice de lane autoritativo.
+            Dez jogadores entram primeiro no draft autoritativo com papéis, pick publicado e ready-lock antes da partida.
           </p>
           <button
             disabled={conn.inQueue}
@@ -1516,7 +1517,7 @@ function Match({ heroId, summoners, profile, onMatchEnd, onPlayAgain, onExit }: 
 }
 
 export default function App() {
-  const { match: onlineMatch } = useConnection();
+  const { match: onlineMatch, draft: onlineDraft } = useConnection();
   const [profile, setProfile] = useState<Profile>(() => loadProfile());
   const [match, setMatch] = useState<{ heroId: string; summoners: string[] } | null>(null);
   const [drafting, setDrafting] = useState(false);
@@ -1552,6 +1553,8 @@ export default function App() {
     }} />;
   } else if (onlineMatch) {
     screen = <OnlineMatchScreen />;
+  } else if (onlineDraft) {
+    screen = <RankedDraftScreen />;
   } else if (match) {
     screen = <Match key={gameKey} heroId={match.heroId} summoners={match.summoners} profile={profile}
       onMatchEnd={(_rec, p) => setProfile(p)}
