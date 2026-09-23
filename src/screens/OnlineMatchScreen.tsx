@@ -204,7 +204,8 @@ export function OnlineMatchScreen() {
       <canvas ref={canvasRef} className="absolute inset-0 cursor-crosshair" />
       <div className="absolute top-3 left-3 z-10 bg-[#09131a]/90 border-2 border-[#28434d] px-3 py-2 font-mono text-xs min-w-64">
         <div className="font-pixel text-[9px] text-[#e8c860] mb-2">FORGED MOBA · AUTHORITATIVE ONLINE</div>
-        <div>match {match.matchId.slice(0, 8)} · team {match.team} · slot {match.slot}</div>
+        <div>{match.mode === 'duel1v1' ? 'DUEL 1V1' : 'RANKED 5V5'} · match {match.matchId.slice(0, 8)}</div>
+        <div>team {match.team} · slot {match.slot}</div>
         <div>tick {authoritativeSnapshot?.serverTick ?? '—'} · {match.serverTickRate} Hz · snapshots ~10 Hz</div>
         <div>RTT {networkMetrics.rttMs === null ? '—' : networkMetrics.rttMs.toFixed(1)} ms · jitter {networkMetrics.jitterMs.toFixed(1)} ms</div>
         <div>correction {networkMetrics.correctionDistance.toFixed(2)} · pending {pendingInputs}</div>
