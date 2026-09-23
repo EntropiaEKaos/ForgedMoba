@@ -15,7 +15,6 @@ export function OnlineMatchScreen() {
     match,
     user,
     authoritativeSnapshot,
-    predictedState,
     networkMetrics,
     pendingInputs,
     networkError,
