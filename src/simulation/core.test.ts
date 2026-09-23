@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { CoreMovementCommand } from '../shared/protocol.ts';
+import { combatFixtureCommands } from './fixtures/combatRepro.ts';
 import { createSimulation, stepSimulation } from './core.ts';
 import { runDeterminismProbe } from './determinism.ts';
 import { hashSimulationState } from './hash.ts';
@@ -102,4 +103,114 @@ test('spatial hash returns stable sorted candidate IDs', () => {
   const ids = querySpatialHash(index, 1500, 1500, 2000);
   assert.deepEqual(ids, [...ids].sort((a, b) => a - b));
   assert.ok(ids.length >= 10);
+});
+
+
+test('Gareth Q is authoritative, applies slow and respects cooldown', () => {
+  const state = createSimulation({
+    ...options,
+    players: [
+      { playerId: 'blue-1', team: 0 as const, x: 1000, y: 1000, heroId: 'gareth' as const },
+      { playerId: 'red-1', team: 1 as const, x: 1060, y: 1000, heroId: 'luxana' as const },
+    ],
+  });
+  const target = state.entities['2'];
+  const hpBefore = target.hp;
+  stepSimulation(state, [{ type: 'cast', playerId: 'blue-1', seq: 1, tick: 0, slot: 'Q', targetId: 2 }]);
+  assert.ok(target.hp < hpBefore);
+  assert.ok(target.statuses.some((status) => status.kind === 'slow'));
+  assert.ok(state.entities['1'].abilityCooldowns.Q > 0);
+  const afterFirst = target.hp;
+  stepSimulation(state, [{ type: 'cast', playerId: 'blue-1', seq: 2, tick: 1, slot: 'Q', targetId: 2 }]);
+  assert.equal(target.hp, afterFirst);
+});
+
+test('Luxana Q resolves a deterministic line hit and roots the first enemy', () => {
+  const state = createSimulation({
+    ...options,
+    players: [
+      { playerId: 'blue-1', team: 0 as const, x: 1000, y: 1000, heroId: 'gareth' as const },
+      { playerId: 'red-1', team: 1 as const, x: 1060, y: 1000, heroId: 'luxana' as const },
+    ],
+  });
+  const target = state.entities['1'];
+  const hpBefore = target.hp;
+  stepSimulation(state, [{ type: 'cast', playerId: 'red-1', seq: 1, tick: 0, slot: 'Q', x: 800, y: 1000 }]);
+  assert.ok(target.hp < hpBefore);
+  assert.ok(target.statuses.some((status) => status.kind === 'root'));
+  const xBefore = target.x;
+  stepSimulation(state, [{ type: 'move', playerId: 'blue-1', seq: 1, tick: 1, x: 1300, y: 1000 }]);
+  assert.equal(target.x, xBefore);
+});
+
+test('lane XP is shared deterministically between nearby allied heroes', () => {
+  const state = createSimulation({
+    seed: 42,
+    contentVersion: 'test-content',
+    withLane: true,
+    players: [
+      { playerId: 'blue-1', team: 0 as const, x: 1000, y: 1000, heroId: 'gareth' as const },
+      { playerId: 'blue-2', team: 0 as const, x: 1020, y: 1000, heroId: 'luxana' as const },
+      { playerId: 'red-1', team: 1 as const, x: 1600, y: 1000, heroId: 'luxana' as const },
+    ],
+  });
+  stepSimulation(state, []);
+  const killer = state.entities['1'];
+  const ally = state.entities['2'];
+  const minion = Object.values(state.entities).find((entity) => entity.kind === 'minion' && entity.team === 1);
+  assert.ok(minion);
+  minion.x = killer.x + 20;
+  minion.y = killer.y;
+  minion.hp = 1;
+  const killerXp = killer.xp;
+  const allyXp = ally.xp;
+  stepSimulation(state, [{ type: 'attack', playerId: 'blue-1', seq: 1, tick: state.tick, targetId: minion.id }]);
+  assert.ok(killer.xp > killerXp);
+  assert.ok(ally.xp > allyXp);
+  assert.equal(killer.xp - killerXp, ally.xp - allyXp);
+});
+
+test('tower prioritizes a hero that damages an allied hero in tower range', () => {
+  const state = createSimulation({
+    seed: 77,
+    contentVersion: 'test-content',
+    withLane: true,
+    players: [
+      { playerId: 'blue-1', team: 0 as const, x: 600, y: 1500, heroId: 'gareth' as const },
+      { playerId: 'red-1', team: 1 as const, x: 640, y: 1500, heroId: 'luxana' as const },
+    ],
+  });
+  const blueTower = Object.values(state.entities).find((entity) => entity.kind === 'tower' && entity.team === 0);
+  assert.ok(blueTower);
+  stepSimulation(state, [{ type: 'attack', playerId: 'red-1', seq: 1, tick: 0, targetId: 1 }]);
+  assert.equal(blueTower.attackTargetId, 2);
+});
+
+test('overlapping movable entities separate deterministically', () => {
+  const state = createSimulation({
+    seed: 9,
+    contentVersion: 'test-content',
+    players: [
+      { playerId: 'blue-1', team: 0 as const, x: 1000, y: 1000 },
+      { playerId: 'red-1', team: 1 as const, x: 1000, y: 1000 },
+    ],
+  });
+  stepSimulation(state, []);
+  const a = state.entities['1'];
+  const b = state.entities['2'];
+  assert.notDeepEqual([a.x, a.y], [b.x, b.y]);
+});
+
+test('recorded combat command fixture stays deterministic', () => {
+  const fixtureOptions = {
+    seed: 0xBADA55,
+    contentVersion: 'combat-fixture-v1',
+    players: [
+      { playerId: 'blue-1', team: 0 as const, x: 1000, y: 1000, heroId: 'gareth' as const },
+      { playerId: 'red-1', team: 1 as const, x: 1060, y: 1000, heroId: 'luxana' as const },
+    ],
+  };
+  const probe = runDeterminismProbe(fixtureOptions, 500, combatFixtureCommands);
+  assert.equal(probe.ok, true, 'fixture divergiu no tick ' + probe.firstDivergentTick);
+  assert.equal(probe.hashA, probe.hashB);
 });
