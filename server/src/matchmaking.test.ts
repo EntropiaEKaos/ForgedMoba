@@ -43,3 +43,24 @@ test('same account cannot occupy multiple queue slots through different sockets'
   assert.equal(duplicate.joined, false);
   assert.equal(queues.size('duel1v1'), 1);
 });
+
+
+test('3v3 skirmish becomes ready with exactly six players and stays isolated', () => {
+  const queues = new MatchmakingQueues();
+  for (let i = 0; i < 5; i += 1) {
+    queues.join(
+      { userId: 's' + i, username: 'S' + i, socketId: 'ss' + i },
+      'skirmish3v3',
+    );
+  }
+  queues.join({ userId: 'duel-a', username: 'DA', socketId: 'duel-a' }, 'duel1v1');
+  assert.equal(queues.takeReady('skirmish3v3'), null);
+
+  queues.join({ userId: 's5', username: 'S5', socketId: 'ss5' }, 'skirmish3v3');
+  const ready = queues.takeReady('skirmish3v3');
+  assert.equal(ready?.length, 6);
+  assert.deepEqual(ready?.map((entry) => entry.userId), ['s0', 's1', 's2', 's3', 's4', 's5']);
+  assert.equal(queues.size('skirmish3v3'), 0);
+  assert.equal(queues.size('duel1v1'), 1);
+  assert.equal(queues.requiredPlayers('skirmish3v3'), 6);
+});
