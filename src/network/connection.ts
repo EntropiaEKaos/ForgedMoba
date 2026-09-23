@@ -8,6 +8,7 @@ import type {
   AuthoritativeSnapshot,
   CoreSimulationCommand,
   MatchFoundPayload,
+  MatchMode,
 } from '../shared/protocol.ts';
 import type { SimulationState } from '../simulation/types.ts';
 import { SnapshotInterpolationBuffer, type InterpolatedFrame } from './interpolation.ts';
@@ -32,7 +33,12 @@ const USER_KEY = 'pixelrift_user';
 type Listener = () => void;
 type StripCommandEnvelope<T> = T extends unknown ? Omit<T, 'playerId' | 'seq' | 'tick'> : never;
 type LocalSimulationCommand = StripCommandEnvelope<CoreSimulationCommand>;
-type QueueJoinedPayload = { position: number; estimatedTime: number };
+type QueueJoinedPayload = {
+  mode: MatchMode;
+  position: number;
+  requiredPlayers: number;
+  estimatedTime: number;
+};
 type GameErrorPayload = { code?: string };
 
 class ConnectionManager {
@@ -44,6 +50,8 @@ class ConnectionManager {
   inQueue = false;
   queuePos: number | null = null;
   queueEta = 0;
+  queueMode: MatchMode | null = null;
+  queueRequiredPlayers = 0;
   match: MatchFoundPayload | null = null;
   lastNetworkError: string | null = null;
   authoritativeSnapshot: AuthoritativeSnapshot<SimulationState> | null = null;
@@ -125,7 +133,9 @@ class ConnectionManager {
 
   private onQueueJoined = (data: QueueJoinedPayload) => {
     this.inQueue = true;
+    this.queueMode = data.mode;
     this.queuePos = data.position;
+    this.queueRequiredPlayers = data.requiredPlayers;
     this.queueEta = data.estimatedTime;
     this.emit();
   };
@@ -133,6 +143,7 @@ class ConnectionManager {
   private onQueueFound = (data: MatchFoundPayload) => {
     if (
       !data?.matchId ||
+      (data.mode !== 'duel1v1' && data.mode !== 'ranked5v5') ||
       (data.team !== 0 && data.team !== 1) ||
       !Number.isInteger(data.slot) ||
       !data.contentVersion ||
@@ -142,6 +153,8 @@ class ConnectionManager {
     this.inQueue = false;
     this.queuePos = null;
     this.queueEta = 0;
+    this.queueMode = null;
+    this.queueRequiredPlayers = 0;
     this.match = data;
     this.resetNetworkMatchState();
     this.prediction = new ClientPrediction(data.playerId);
@@ -154,6 +167,8 @@ class ConnectionManager {
     this.inQueue = false;
     this.queuePos = null;
     this.queueEta = 0;
+    this.queueMode = null;
+    this.queueRequiredPlayers = 0;
     this.emit();
   };
 
@@ -364,6 +379,8 @@ class ConnectionManager {
     this.inQueue = false;
     this.queuePos = null;
     this.queueEta = 0;
+    this.queueMode = null;
+    this.queueRequiredPlayers = 0;
     this.match = null;
     this.resetNetworkMatchState();
     this.enterGuest('Convidado');
@@ -373,15 +390,17 @@ class ConnectionManager {
     return this.status === 'online';
   }
 
-  joinQueue() {
+  joinQueue(mode: MatchMode = 'ranked5v5') {
     if (!this.isOnline || !this.socket || this.user?.mode !== 'account') return;
     this.match = null;
     this.resetNetworkMatchState();
     this.lastNetworkError = null;
     this.inQueue = true;
+    this.queueMode = mode;
+    this.queueRequiredPlayers = mode === 'duel1v1' ? 2 : 10;
     this.queuePos = 0;
     this.emit();
-    this.socket.emit('queue:join');
+    this.socket.emit('queue:join', { mode });
   }
 
   leaveQueue() {
@@ -390,6 +409,8 @@ class ConnectionManager {
     this.inQueue = false;
     this.queuePos = null;
     this.queueEta = 0;
+    this.queueMode = null;
+    this.queueRequiredPlayers = 0;
     this.emit();
   }
 
@@ -483,5 +504,7 @@ export function useConnection() {
     predictedState: conn.predictedState,
     networkMetrics: conn.getNetworkMetrics(),
     pendingInputs: conn.pendingInputs,
+    queueMode: conn.queueMode,
+    queueRequiredPlayers: conn.queueRequiredPlayers,
   };
 }
