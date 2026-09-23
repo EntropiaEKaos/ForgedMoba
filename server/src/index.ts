@@ -11,16 +11,21 @@ import { Server as SocketServer, type Socket } from 'socket.io';
 import cors from 'cors';
 import jwt, { type JwtPayload } from 'jsonwebtoken';
 import type { MatchMode, PlayerCommand } from '../../src/shared/protocol.ts';
-import { CURRENT_AUTHORITATIVE_CONTENT } from '../../src/shared/authoritativeContent.ts';
+import {
+  CURRENT_AUTHORITATIVE_CONTENT,
+  type AuthoritativeHeroId,
+} from '../../src/shared/authoritativeContent.ts';
 import { SIM_TICK_RATE } from '../../src/simulation/index.ts';
 import { MatchRunner, stableSeedFromMatchId } from './matchRunner.ts';
 import { MatchmakingQueues, type MatchmakingEntry } from './matchmaking.ts';
 import { ReconnectGraceRegistry } from './reconnectGrace.ts';
+import { RankedDraftRoom } from './rankedDraft.ts';
 
 const PORT = Number(process.env.PORT || 3001);
 const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:5173';
-const SERVER_VERSION = '2.6.0';
+const SERVER_VERSION = '2.7.0';
 const RECONNECT_GRACE_MS = 30_000;
+const RANKED_DRAFT_TIMEOUT_MS = 120_000;
 const CONTENT_VERSION = CURRENT_AUTHORITATIVE_CONTENT.contentVersion;
 if (CURRENT_AUTHORITATIVE_CONTENT.payload.rules.tickRate !== SIM_TICK_RATE) {
   throw new Error('Published content tickRate does not match simulation tickRate.');
@@ -43,7 +48,11 @@ interface DbUser {
   level: number;
 }
 interface QueueEntry extends MatchmakingEntry {}
-interface MatchPlayer extends QueueEntry { team: 0 | 1; slot: number; }
+interface MatchPlayer extends QueueEntry {
+  team: 0 | 1;
+  slot: number;
+  heroId?: AuthoritativeHeroId;
+}
 interface ActiveMatch {
   id: string;
   mode: MatchMode;
@@ -51,7 +60,12 @@ interface ActiveMatch {
   createdAt: number;
   runner: MatchRunner;
 }
-interface AuthedSocketData { userId: string; username: string; matchId?: string; }
+interface AuthedSocketData {
+  userId: string;
+  username: string;
+  matchId?: string;
+  draftId?: string;
+}
 interface GameInputPayload { matchId?: unknown; command?: unknown; }
 
 const users = new Map<string, DbUser>();
@@ -59,6 +73,7 @@ const usersByName = new Map<string, string>();
 const usersByEmail = new Map<string, string>();
 const matchmaking = new MatchmakingQueues();
 const activeMatches = new Map<string, ActiveMatch>();
+const draftRooms = new Map<string, RankedDraftRoom>();
 const reconnectGrace = new ReconnectGraceRegistry(RECONNECT_GRACE_MS);
 
 const app = express();
@@ -136,6 +151,17 @@ function matchForUser(userId: string): { match: ActiveMatch; player: MatchPlayer
   return null;
 }
 
+function draftForUser(userId: string): RankedDraftRoom | null {
+  for (const draft of draftRooms.values()) {
+    if (draft.hasPlayer(userId)) return draft;
+  }
+  return null;
+}
+
+function draftRoomName(draftId: string): string {
+  return 'draft:' + draftId;
+}
+
 function foundPayload(match: ActiveMatch, player: MatchPlayer) {
   return {
     matchId: match.id,
@@ -149,20 +175,68 @@ function foundPayload(match: ActiveMatch, player: MatchPlayer) {
   };
 }
 
-function createMatch(players: QueueEntry[], mode: MatchMode): ActiveMatch {
+function broadcastDraft(draft: RankedDraftRoom): void {
+  io.to(draftRoomName(draft.draftId)).emit('draft:state', draft.snapshot());
+}
+
+function cancelDraft(draftId: string, code: string): void {
+  const draft = draftRooms.get(draftId);
+  if (!draft) return;
+  draft.cancel();
+  const snapshot = draft.snapshot();
+  io.to(draftRoomName(draftId)).emit('draft:state', snapshot);
+  io.to(draftRoomName(draftId)).emit('draft:cancelled', { draftId, code });
+
+  for (const participant of snapshot.players) {
+    const socketId = draft.socketIdFor(participant.playerId);
+    const participantSocket = socketId ? io.sockets.sockets.get(socketId) : undefined;
+    if (!participantSocket) continue;
+    delete socketIdentity(participantSocket).draftId;
+    participantSocket.leave(draftRoomName(draftId));
+  }
+  draftRooms.delete(draftId);
+}
+
+function createRankedDraft(players: QueueEntry[]): RankedDraftRoom {
+  const draftId = randomUUID();
+  const draft = new RankedDraftRoom({
+    draftId,
+    entries: players,
+    contentVersion: CONTENT_VERSION,
+    allowedHeroIds: CURRENT_AUTHORITATIVE_CONTENT.payload.heroes.map((hero) => hero.id),
+    timeoutMs: RANKED_DRAFT_TIMEOUT_MS,
+  });
+  draftRooms.set(draftId, draft);
+
+  for (const participant of draft.snapshot().players) {
+    const socketId = draft.socketIdFor(participant.playerId);
+    const participantSocket = socketId ? io.sockets.sockets.get(socketId) : undefined;
+    if (!participantSocket) {
+      draft.markDisconnected(socketId ?? '');
+      continue;
+    }
+    participantSocket.join(draftRoomName(draftId));
+    socketIdentity(participantSocket).draftId = draftId;
+    participantSocket.emit('draft:found', draft.snapshot());
+  }
+  broadcastDraft(draft);
+  console.log('[draft] criada ' + draftId + ' jogadores=10 content=' + CONTENT_VERSION);
+  return draft;
+}
+
+function createAssignedMatch(assigned: MatchPlayer[], mode: MatchMode): ActiveMatch {
   const id = randomUUID();
-  const teamSize = Math.max(1, Math.ceil(players.length / 2));
-  const assigned = players.map<MatchPlayer>((player, index) => ({
-    ...player,
-    team: index < teamSize ? 0 : 1,
-    slot: index < teamSize ? index : index - teamSize,
-  }));
   const runner = new MatchRunner({
     matchId: id,
     contentVersion: CONTENT_VERSION,
     seed: stableSeedFromMatchId(id),
     content: CURRENT_AUTHORITATIVE_CONTENT,
-    players: assigned.map((player) => ({ playerId: player.userId, team: player.team, slot: player.slot })),
+    players: assigned.map((player) => ({
+      playerId: player.userId,
+      team: player.team,
+      slot: player.slot,
+      heroId: player.heroId,
+    })),
     onSnapshot: (snapshot) => io.to(id).emit('game:snapshot', snapshot),
     onComplete: (state) => {
       console.log('[match] concluída ' + id + ' vencedor=' + state.winner);
@@ -196,6 +270,44 @@ function createMatch(players: QueueEntry[], mode: MatchMode): ActiveMatch {
   return match;
 }
 
+function createMatch(players: QueueEntry[], mode: Exclude<MatchMode, 'ranked5v5'>): ActiveMatch {
+  const teamSize = Math.max(1, Math.ceil(players.length / 2));
+  const assigned = players.map<MatchPlayer>((player, index) => ({
+    ...player,
+    team: index < teamSize ? 0 : 1,
+    slot: index < teamSize ? index : index - teamSize,
+  }));
+  return createAssignedMatch(assigned, mode);
+}
+
+function launchDraft(draft: RankedDraftRoom): ActiveMatch | null {
+  const launchPlayers = draft.launchPlayers();
+  if (!launchPlayers) return null;
+
+  const draftId = draft.draftId;
+  const assigned: MatchPlayer[] = launchPlayers.map((player) => ({
+    userId: player.userId,
+    username: player.username,
+    socketId: player.socketId,
+    team: player.team,
+    slot: player.slot,
+    heroId: player.heroId,
+  }));
+
+  for (const participant of assigned) {
+    const participantSocket = io.sockets.sockets.get(participant.socketId);
+    if (!participantSocket) return null;
+    delete socketIdentity(participantSocket).draftId;
+    participantSocket.leave(draftRoomName(draftId));
+  }
+
+  draftRooms.delete(draftId);
+  const match = createAssignedMatch(assigned, 'ranked5v5');
+  console.log('[draft] lançada ' + draftId + ' -> match=' + match.id);
+  return match;
+}
+
+
 app.get('/api/content/current', (_req, res) => {
   res.json(CURRENT_AUTHORITATIVE_CONTENT);
 });
@@ -212,6 +324,8 @@ app.get('/api/health', (_req, res) => {
     duelQueueSize: matchmaking.size('duel1v1'),
     skirmishQueueSize: matchmaking.size('skirmish3v3'),
     reconnectGraceMs: RECONNECT_GRACE_MS,
+    rankedDraftTimeoutMs: RANKED_DRAFT_TIMEOUT_MS,
+    activeDrafts: draftRooms.size,
     activeMatches: activeMatches.size,
   });
 });
@@ -230,6 +344,13 @@ const reconnectSweep = setInterval(() => {
   }
 }, 1_000);
 reconnectSweep.unref();
+
+const draftSweep = setInterval(() => {
+  for (const draft of draftRooms.values()) {
+    if (draft.isExpired()) cancelDraft(draft.draftId, 'draft-timeout');
+  }
+}, 1_000);
+draftSweep.unref();
 
 app.post('/api/auth/register', authRateLimit, (req, res) => {
   const { username, email, password } = req.body as Record<string, unknown>;
@@ -290,38 +411,57 @@ io.use((socket, next) => {
 
 io.on('connection', (socket) => {
   const identity = socketIdentity(socket);
-  const resumable = matchForUser(identity.userId);
-  if (resumable) {
-    const reconnectStatus = reconnectGrace.resolveReconnect(resumable.match.id, identity.userId);
-    if (reconnectStatus === 'expired') {
-      resumable.match.runner.forfeitTeam(resumable.player.team);
-      socket.emit('game:error', { code: 'reconnect-window-expired' });
-    } else {
-    const previousSocketId = resumable.player.socketId;
+  const resumableDraft = draftForUser(identity.userId);
+  if (resumableDraft) {
+    const previousSocketId = resumableDraft.socketIdFor(identity.userId);
     if (previousSocketId && previousSocketId !== socket.id) {
       const previousSocket = io.sockets.sockets.get(previousSocketId);
       if (previousSocket) {
-        delete socketIdentity(previousSocket).matchId;
+        delete socketIdentity(previousSocket).draftId;
         previousSocket.emit('session:replaced');
         previousSocket.disconnect(true);
       }
     }
-    resumable.player.socketId = socket.id;
-    identity.matchId = resumable.match.id;
-    socket.join(resumable.match.id);
-    socket.emit('game:resumed', foundPayload(resumable.match, resumable.player));
-    socket.emit('game:snapshot', resumable.match.runner.snapshot());
-    for (const lease of reconnectGrace.forMatch(resumable.match.id)) {
-      socket.emit('game:player-disconnected', {
-        matchId: resumable.match.id,
-        playerId: lease.playerId,
-        reconnectDeadline: lease.expiresAt,
-      });
-    }
-    socket.to(resumable.match.id).emit('game:player-reconnected', {
-      matchId: resumable.match.id,
-      playerId: identity.userId,
-    });
+    resumableDraft.replaceSocket(identity.userId, socket.id);
+    identity.draftId = resumableDraft.draftId;
+    socket.join(draftRoomName(resumableDraft.draftId));
+    socket.emit('draft:found', resumableDraft.snapshot());
+    broadcastDraft(resumableDraft);
+    if (resumableDraft.isReadyToLaunch) launchDraft(resumableDraft);
+  } else {
+    const resumable = matchForUser(identity.userId);
+    if (resumable) {
+      const reconnectStatus = reconnectGrace.resolveReconnect(resumable.match.id, identity.userId);
+      if (reconnectStatus === 'expired') {
+        resumable.match.runner.forfeitTeam(resumable.player.team);
+        socket.emit('game:error', { code: 'reconnect-window-expired' });
+      } else {
+        const previousSocketId = resumable.player.socketId;
+        if (previousSocketId && previousSocketId !== socket.id) {
+          const previousSocket = io.sockets.sockets.get(previousSocketId);
+          if (previousSocket) {
+            delete socketIdentity(previousSocket).matchId;
+            previousSocket.emit('session:replaced');
+            previousSocket.disconnect(true);
+          }
+        }
+        resumable.player.socketId = socket.id;
+        identity.matchId = resumable.match.id;
+        socket.join(resumable.match.id);
+        socket.emit('game:resumed', foundPayload(resumable.match, resumable.player));
+        socket.emit('game:snapshot', resumable.match.runner.snapshot());
+        for (const lease of reconnectGrace.forMatch(resumable.match.id)) {
+          socket.emit('game:player-disconnected', {
+            matchId: resumable.match.id,
+            playerId: lease.playerId,
+            reconnectDeadline: lease.expiresAt,
+          });
+        }
+        socket.to(resumable.match.id).emit('game:player-reconnected', {
+          matchId: resumable.match.id,
+          playerId: identity.userId,
+        });
+      }
     }
   }
 
@@ -332,7 +472,7 @@ io.on('connection', (socket) => {
   console.log('[socket] conectado: ' + identity.username + ' (' + socket.id + ')');
 
   socket.on('queue:join', (payload?: { mode?: unknown; contentVersion?: unknown }) => {
-    if (identity.matchId) return;
+    if (identity.matchId || identity.draftId) return;
     if (payload?.contentVersion !== CONTENT_VERSION) {
       socket.emit('game:error', { code: 'content-version-mismatch' });
       return;
@@ -359,17 +499,66 @@ io.on('connection', (socket) => {
 
     const ready = matchmaking.takeReady(joined.mode);
     if (ready) {
-      const match = createMatch(ready, joined.mode);
-      console.log(
-        '[match] criada ' + match.id + ' mode=' + joined.mode +
-        ' jogadores=' + match.players.length + '; tick=' + SIM_TICK_RATE + 'Hz',
-      );
+      if (joined.mode === 'ranked5v5') {
+        createRankedDraft(ready);
+      } else {
+        const match = createMatch(ready, joined.mode);
+        console.log(
+          '[match] criada ' + match.id + ' mode=' + joined.mode +
+          ' jogadores=' + match.players.length + '; tick=' + SIM_TICK_RATE + 'Hz',
+        );
+      }
     }
   });
 
   socket.on('queue:leave', () => {
     removeSocketFromQueue(socket.id);
     socket.emit('queue:left');
+  });
+
+  socket.on('draft:pick', (payload?: { draftId?: unknown; heroId?: unknown }) => {
+    const draftId = identity.draftId;
+    const draft = draftId ? draftRooms.get(draftId) : undefined;
+    if (
+      !draftId ||
+      payload?.draftId !== draftId ||
+      !draft ||
+      typeof payload.heroId !== 'string'
+    ) {
+      socket.emit('game:error', { code: 'invalid-draft-pick' });
+      return;
+    }
+    const result = draft.pickHero(identity.userId, payload.heroId);
+    if (!result.ok) {
+      socket.emit('game:error', { code: result.code });
+      return;
+    }
+    broadcastDraft(draft);
+  });
+
+  socket.on('draft:ready', (payload?: { draftId?: unknown; ready?: unknown }) => {
+    const draftId = identity.draftId;
+    const draft = draftId ? draftRooms.get(draftId) : undefined;
+    if (!draftId || payload?.draftId !== draftId || !draft || typeof payload.ready !== 'boolean') {
+      socket.emit('game:error', { code: 'invalid-draft-ready' });
+      return;
+    }
+    const result = draft.setReady(identity.userId, payload.ready);
+    if (!result.ok) {
+      socket.emit('game:error', { code: result.code });
+      return;
+    }
+    broadcastDraft(draft);
+    if (draft.isReadyToLaunch) launchDraft(draft);
+  });
+
+  socket.on('draft:leave', (payload?: { draftId?: unknown }) => {
+    const draftId = identity.draftId;
+    if (!draftId || payload?.draftId !== draftId || !draftRooms.has(draftId)) {
+      socket.emit('game:error', { code: 'invalid-draft-leave' });
+      return;
+    }
+    cancelDraft(draftId, 'player-left-draft');
   });
 
   socket.on('game:input', (payload: GameInputPayload) => {
@@ -398,6 +587,13 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', () => {
     removeSocketFromQueue(socket.id);
+    const draftId = identity.draftId;
+    const draft = draftId ? draftRooms.get(draftId) : undefined;
+    if (draftId && draft) {
+      draft.markDisconnected(socket.id);
+      broadcastDraft(draft);
+    }
+
     const matchId = identity.matchId;
     const match = matchId ? activeMatches.get(matchId) : undefined;
     const participant = match?.players.find((entry) => entry.userId === identity.userId);
