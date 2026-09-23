@@ -38,3 +38,14 @@ test('publisher rejects duplicate IDs and malformed rules', () => {
   malformed.rules.tickRate = 0;
   assert.throws(() => validateAuthoritativeContent(malformed), /tickRate/);
 });
+
+
+test('published pack is frozen and detached from the source draft', () => {
+  const draft = structuredClone(CURRENT_AUTHORITATIVE_CONTENT.payload);
+  const published = publishAuthoritativeContent('authority-frozen', draft);
+  const before = published.payload.heroes[0].maxHp;
+  draft.heroes[0].maxHp += 999;
+  assert.equal(published.payload.heroes[0].maxHp, before);
+  assert.equal(Object.isFrozen(published.payload), true);
+  assert.equal(Object.isFrozen(published.payload.heroes[0]), true);
+});
