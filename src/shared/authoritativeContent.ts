@@ -132,18 +132,26 @@ function clone<T>(value: T): T {
   return structuredClone(value);
 }
 
+function deepFreeze<T>(value: T): T {
+  if (value && typeof value === 'object' && !Object.isFrozen(value)) {
+    Object.freeze(value);
+    for (const child of Object.values(value as Record<string, unknown>)) deepFreeze(child);
+  }
+  return value;
+}
+
 export function publishAuthoritativeContent(
   version: string,
   payload: AuthoritativeContentPayload,
 ): PublishedAuthoritativeContent {
   validateAuthoritativeContent(payload);
-  const publishedPayload = clone(payload);
-  const manifest = createContentManifest(version, publishedPayload);
-  return {
+  const publishedPayload = deepFreeze(clone(payload));
+  const manifest = deepFreeze(createContentManifest(version, publishedPayload));
+  return deepFreeze({
     manifest,
     contentVersion: manifest.version + '+' + manifest.hash,
     payload: publishedPayload,
-  };
+  });
 }
 
 export const CURRENT_AUTHORITATIVE_CONTENT = publishAuthoritativeContent('authority-0.7.0', {
