@@ -46,7 +46,15 @@ class ConnectionManager {
   mode: AuthMode = 'guest';
   user: SessionUser | null = null;
   socket: Socket | null = null;
-  serverInfo: { version?: string; players?: number; activeMatches?: number; contentVersion?: string; tickRate?: number } | null = null;
+  serverInfo: {
+    version?: string;
+    players?: number;
+    activeMatches?: number;
+    contentVersion?: string;
+    tickRate?: number;
+    skirmishQueueSize?: number;
+    reconnectGraceMs?: number;
+  } | null = null;
   inQueue = false;
   queuePos: number | null = null;
   queueEta = 0;
@@ -57,6 +65,7 @@ class ConnectionManager {
   lastNetworkError: string | null = null;
   authoritativeSnapshot: AuthoritativeSnapshot<SimulationState> | null = null;
   predictedState: SimulationState | null = null;
+  disconnectedPlayers: Record<string, number> = {};
 
   private snapshotReceivedAt = 0;
   private nextInputSeq = 1;
@@ -101,6 +110,8 @@ class ConnectionManager {
         activeMatches?: number;
         contentVersion?: string;
         tickRate?: number;
+        skirmishQueueSize?: number;
+        reconnectGraceMs?: number;
       };
       this.serverInfo = {
         version: data.version,
@@ -108,6 +119,8 @@ class ConnectionManager {
         activeMatches: data.activeMatches,
         contentVersion: data.contentVersion,
         tickRate: data.tickRate,
+        skirmishQueueSize: data.skirmishQueueSize,
+        reconnectGraceMs: data.reconnectGraceMs,
       };
       return true;
     } catch {
@@ -144,12 +157,14 @@ class ConnectionManager {
   private onQueueFound = (data: MatchFoundPayload) => {
     if (
       !data?.matchId ||
-      (data.mode !== 'duel1v1' && data.mode !== 'ranked5v5') ||
+      (data.mode !== 'duel1v1' && data.mode !== 'skirmish3v3' && data.mode !== 'ranked5v5') ||
       (data.team !== 0 && data.team !== 1) ||
       !Number.isInteger(data.slot) ||
       !data.contentVersion ||
       !Number.isFinite(data.serverTickRate) ||
-      data.serverTickRate <= 0
+      data.serverTickRate <= 0 ||
+      !Number.isFinite(data.reconnectGraceMs) ||
+      data.reconnectGraceMs <= 0
     ) return;
     this.inQueue = false;
     this.queuePos = null;
@@ -158,6 +173,7 @@ class ConnectionManager {
     this.queueRequiredPlayers = 0;
     this.match = data;
     this.matchResult = null;
+    this.disconnectedPlayers = {};
     this.resetNetworkMatchState();
     this.prediction = new ClientPrediction(data.playerId);
     this.nextInputSeq = 1;
@@ -190,6 +206,7 @@ class ConnectionManager {
     this.matchResult = {
       winner: payload.winner === 0 || payload.winner === 1 ? payload.winner : null,
     };
+    this.disconnectedPlayers = {};
     this.emit();
   };
 
@@ -229,6 +246,32 @@ class ConnectionManager {
     this.onQueueFound(data);
   };
 
+  private onPlayerDisconnected = (payload: {
+    matchId?: string;
+    playerId?: string;
+    reconnectDeadline?: number;
+  }) => {
+    if (
+      !this.match ||
+      payload.matchId !== this.match.matchId ||
+      typeof payload.playerId !== 'string' ||
+      !Number.isFinite(payload.reconnectDeadline)
+    ) return;
+    this.disconnectedPlayers = {
+      ...this.disconnectedPlayers,
+      [payload.playerId]: Number(payload.reconnectDeadline),
+    };
+    this.emit();
+  };
+
+  private onPlayerReconnected = (payload: { matchId?: string; playerId?: string }) => {
+    if (!this.match || payload.matchId !== this.match.matchId || typeof payload.playerId !== 'string') return;
+    const next = { ...this.disconnectedPlayers };
+    delete next[payload.playerId];
+    this.disconnectedPlayers = next;
+    this.emit();
+  };
+
   private onSessionReplaced = () => {
     this.lastNetworkError = 'session-replaced-by-newer-connection';
     this.match = null;
@@ -248,6 +291,8 @@ class ConnectionManager {
     socket.on('game:snapshot', this.onGameSnapshot);
     socket.on('game:resumed', this.onGameResumed);
     socket.on('game:complete', this.onGameComplete);
+    socket.on('game:player-disconnected', this.onPlayerDisconnected);
+    socket.on('game:player-reconnected', this.onPlayerReconnected);
     socket.on('session:replaced', this.onSessionReplaced);
   }
 
@@ -262,6 +307,8 @@ class ConnectionManager {
     socket.off('game:snapshot', this.onGameSnapshot);
     socket.off('game:resumed', this.onGameResumed);
     socket.off('game:complete', this.onGameComplete);
+    socket.off('game:player-disconnected', this.onPlayerDisconnected);
+    socket.off('game:player-reconnected', this.onPlayerReconnected);
     socket.off('session:replaced', this.onSessionReplaced);
   }
 
@@ -303,6 +350,7 @@ class ConnectionManager {
     this.prediction = null;
     this.interpolation.clear();
     this.telemetry.reset();
+    this.disconnectedPlayers = {};
   }
 
   private startPingLoop() {
@@ -423,7 +471,7 @@ class ConnectionManager {
     this.lastNetworkError = null;
     this.inQueue = true;
     this.queueMode = mode;
-    this.queueRequiredPlayers = mode === 'duel1v1' ? 2 : 10;
+    this.queueRequiredPlayers = mode === 'duel1v1' ? 2 : mode === 'skirmish3v3' ? 6 : 10;
     this.queuePos = 0;
     this.emit();
     this.socket.emit('queue:join', { mode });
@@ -542,5 +590,6 @@ export function useConnection() {
     pendingInputs: conn.pendingInputs,
     queueMode: conn.queueMode,
     queueRequiredPlayers: conn.queueRequiredPlayers,
+    disconnectedPlayers: conn.disconnectedPlayers,
   };
 }
