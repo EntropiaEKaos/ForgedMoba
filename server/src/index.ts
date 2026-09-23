@@ -27,6 +27,7 @@ import {
   createIdentityStore,
   type IdentityUser,
 } from './identityStore.ts';
+import { createPlayerSnapshot } from './snapshotView.ts';
 
 const PORT = Number(process.env.PORT || 3001);
 const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:5173';
@@ -288,7 +289,12 @@ function createAssignedMatch(assigned: MatchPlayer[], mode: MatchMode): ActiveMa
     })),
     onSnapshot: (snapshot) => {
       metrics.inc('forged_snapshots_total', { mode });
-      io.to(id).emit('game:snapshot', snapshot);
+      for (const participant of assigned) {
+        const participantSocket = io.sockets.sockets.get(participant.socketId);
+        if (!participantSocket) continue;
+        participantSocket.emit('game:snapshot', createPlayerSnapshot(snapshot, participant.userId));
+        metrics.inc('forged_snapshot_deliveries_total', { mode });
+      }
     },
     onComplete: (state, replay) => {
       console.log('[match] concluída ' + id + ' vencedor=' + state.winner);
@@ -325,7 +331,13 @@ function createAssignedMatch(assigned: MatchPlayer[], mode: MatchMode): ActiveMa
     socketIdentity(playerSocket).matchId = id;
     playerSocket.emit('queue:found', foundPayload(match, player));
   }
-  io.to(id).emit('game:snapshot', runner.snapshot());
+  const initialSnapshot = runner.snapshot();
+  for (const player of assigned) {
+    const playerSocket = io.sockets.sockets.get(player.socketId);
+    if (!playerSocket) continue;
+    playerSocket.emit('game:snapshot', createPlayerSnapshot(initialSnapshot, player.userId));
+    metrics.inc('forged_snapshot_deliveries_total', { mode });
+  }
   metrics.inc('forged_snapshots_total', { mode });
   runner.start();
   return match;
@@ -593,7 +605,10 @@ io.on('connection', (socket) => {
         metrics.inc('forged_reconnect_success_total', { mode: resumable.match.mode });
         socket.join(resumable.match.id);
         socket.emit('game:resumed', foundPayload(resumable.match, resumable.player));
-        socket.emit('game:snapshot', resumable.match.runner.snapshot());
+        socket.emit(
+          'game:snapshot',
+          createPlayerSnapshot(resumable.match.runner.snapshot(), identity.userId),
+        );
         for (const lease of reconnectGrace.forMatch(resumable.match.id)) {
           socket.emit('game:player-disconnected', {
             matchId: resumable.match.id,
