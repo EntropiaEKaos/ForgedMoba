@@ -14,4 +14,9 @@ const result = runFiveVFiveLoadProbe({
 });
 
 console.log(JSON.stringify(result, null, 2));
-if (result.finalHashes.length !== result.matches || result.commandsEnqueued <= 0) process.exitCode = 1;
+const expectedSnapshots = result.matches * Math.floor(result.ticksPerMatch / 3);
+if (
+  result.finalHashes.length !== result.matches ||
+  result.commandsEnqueued <= 0 ||
+  result.snapshotsEmitted !== expectedSnapshots
+) process.exitCode = 1;
