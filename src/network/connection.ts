@@ -53,6 +53,7 @@ class ConnectionManager {
   queueMode: MatchMode | null = null;
   queueRequiredPlayers = 0;
   match: MatchFoundPayload | null = null;
+  matchResult: { winner: 0 | 1 | null } | null = null;
   lastNetworkError: string | null = null;
   authoritativeSnapshot: AuthoritativeSnapshot<SimulationState> | null = null;
   predictedState: SimulationState | null = null;
@@ -156,6 +157,7 @@ class ConnectionManager {
     this.queueMode = null;
     this.queueRequiredPlayers = 0;
     this.match = data;
+    this.matchResult = null;
     this.resetNetworkMatchState();
     this.prediction = new ClientPrediction(data.playerId);
     this.nextInputSeq = 1;
@@ -180,6 +182,14 @@ class ConnectionManager {
 
   private onGameError = (payload: GameErrorPayload) => {
     this.lastNetworkError = payload?.code || 'Erro de protocolo da partida.';
+    this.emit();
+  };
+
+  private onGameComplete = (payload: { matchId?: string; winner?: 0 | 1 | null }) => {
+    if (!this.match || payload?.matchId !== this.match.matchId) return;
+    this.matchResult = {
+      winner: payload.winner === 0 || payload.winner === 1 ? payload.winner : null,
+    };
     this.emit();
   };
 
@@ -229,6 +239,7 @@ class ConnectionManager {
     socket.on('game:error', this.onGameError);
     socket.on('game:snapshot', this.onGameSnapshot);
     socket.on('game:resumed', this.onGameResumed);
+    socket.on('game:complete', this.onGameComplete);
   }
 
   private unbindSocketEvents(socket: Socket) {
@@ -241,6 +252,7 @@ class ConnectionManager {
     socket.off('game:error', this.onGameError);
     socket.off('game:snapshot', this.onGameSnapshot);
     socket.off('game:resumed', this.onGameResumed);
+    socket.off('game:complete', this.onGameComplete);
   }
 
   connectSocket(token?: string) {
@@ -307,6 +319,7 @@ class ConnectionManager {
     this.disconnectSocket();
     this.mode = 'guest';
     this.match = null;
+    this.matchResult = null;
     this.resetNetworkMatchState();
     this.user = {
       id: 'guest',
@@ -366,6 +379,7 @@ class ConnectionManager {
     this.mode = 'account';
     this.user = user;
     this.match = null;
+    this.matchResult = null;
     this.resetNetworkMatchState();
     localStorage.setItem(TOKEN_KEY, token);
     localStorage.setItem(USER_KEY, JSON.stringify(user));
@@ -382,6 +396,7 @@ class ConnectionManager {
     this.queueMode = null;
     this.queueRequiredPlayers = 0;
     this.match = null;
+    this.matchResult = null;
     this.resetNetworkMatchState();
     this.enterGuest('Convidado');
   }
@@ -393,6 +408,7 @@ class ConnectionManager {
   joinQueue(mode: MatchMode = 'ranked5v5') {
     if (!this.isOnline || !this.socket || this.user?.mode !== 'account') return;
     this.match = null;
+    this.matchResult = null;
     this.resetNetworkMatchState();
     this.lastNetworkError = null;
     this.inQueue = true;
@@ -416,6 +432,7 @@ class ConnectionManager {
 
   clearMatch() {
     this.match = null;
+    this.matchResult = null;
     this.resetNetworkMatchState();
     this.snapshotReceivedAt = 0;
     this.emit();
@@ -499,6 +516,7 @@ export function useConnection() {
     user: conn.user,
     serverInfo: conn.serverInfo,
     match: conn.match,
+    matchResult: conn.matchResult,
     networkError: conn.lastNetworkError,
     authoritativeSnapshot: conn.authoritativeSnapshot,
     predictedState: conn.predictedState,
