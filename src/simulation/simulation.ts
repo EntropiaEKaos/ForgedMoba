@@ -1,7 +1,7 @@
-import { FIXED_DT } from './constants';
-import { SeededRng } from './prng';
-import type { InputCommand, PlayerId, TeamId } from '../shared/protocol';
-import { createInitialState, type SimEntity, type SimulationState } from './state';
+import { FIXED_DT } from './constants.js';
+import { SeededRng } from './prng.js';
+import type { InputCommand, PlayerId, TeamId } from '../shared/protocol.js';
+import { createInitialState, type SimEntity, type SimulationState } from './state.js';
 
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 
