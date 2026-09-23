@@ -80,3 +80,26 @@ test('1v1 forfeit is server authoritative and completes with the opponent winner
   assert.equal(runner.forfeit('blue-1'), false);
   assert.equal(runner.forfeit('missing'), false);
 });
+
+
+test('team-level forfeit completes a 3v3 match with the opposite team winner', () => {
+  let completedWinner: 0 | 1 | null = null;
+  const runner = new MatchRunner({
+    matchId: 'skirmish-team-forfeit',
+    contentVersion: 'core-0.3+test',
+    seed: stableSeedFromMatchId('skirmish-team-forfeit'),
+    players: [
+      { playerId: 'b1', team: 0, slot: 0 },
+      { playerId: 'b2', team: 0, slot: 1 },
+      { playerId: 'b3', team: 0, slot: 2 },
+      { playerId: 'r1', team: 1, slot: 0 },
+      { playerId: 'r2', team: 1, slot: 1 },
+      { playerId: 'r3', team: 1, slot: 2 },
+    ],
+    onComplete: (state) => { completedWinner = state.winner; },
+  });
+  assert.equal(runner.forfeitTeam(1), true);
+  assert.equal(runner.state.winner, 0);
+  assert.equal(completedWinner, 0);
+  assert.equal(runner.forfeitTeam(1), false);
+});
