@@ -970,6 +970,37 @@ export function createSimulation(
   return state;
 }
 
+/**
+ * Predição client-side limitada ao estado possuído pelo jogador.
+ * Não executa AI, waves, jungle ou ataques automáticos, portanto não exige mundo oculto.
+ * Reusa os mesmos validadores/comandos/movimento do core e converge via snapshots autoritativos.
+ */
+export function stepOwnedPrediction(
+  state: SimulationState,
+  playerId: PlayerId,
+  commands: readonly CoreSimulationCommand[],
+  content: AuthoritativeContentPayload = CURRENT_AUTHORITATIVE_CONTENT.payload,
+): void {
+  if (state.winner !== null) return;
+
+  cleanupExpiredWards(state);
+
+  const ordered = commands
+    .filter((command) => command.playerId === playerId)
+    .sort((a, b) => a.seq - b.seq);
+  for (const command of ordered) applyCommand(state, command, content);
+
+  const entity = entityByPlayer(state, playerId);
+  if (entity) {
+    respawnIfReady(state, entity);
+    pruneStatuses(entity, state.tick);
+    decrementCooldowns(entity);
+    moveEntity(state, entity);
+  }
+
+  state.tick += 1;
+}
+
 /** Executa exatamente um tick autoritativo, sem relógio, DOM, rede ou Math.random(). */
 export function stepSimulation(
   state: SimulationState,
