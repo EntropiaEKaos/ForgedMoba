@@ -137,7 +137,8 @@ The existing game is a feature-rich offline prototype. The migration strategy is
 - [x] authoritative React draft screen driven only by server snapshots.
 - [x] selected draft hero IDs are passed into MatchRunner and verified by tests.
 - [x] repeatable concurrent 5v5 load probe with command pressure and final state hashes.
-- [x] CI load gate runs 50 concurrent 5v5 matches for 900 ticks each.
+- [x] CI load gate runs 50 concurrent 5v5 matches for 900 ticks each with 10 Hz authoritative snapshot hashing/cloning.
+- [x] load harness verifies repeatable final hashes across identical concurrent runs.
 - [ ] branch CI + PR CI + post-merge main CI certification.
 
 ## Multiplayer milestones
