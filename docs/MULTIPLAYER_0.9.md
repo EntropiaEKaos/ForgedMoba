@@ -118,6 +118,17 @@ The normal server CI runs:
 
 Movement commands are injected for all 10 players every 15 ticks.
 
+The probe also keeps the production snapshot cadence of one authoritative snapshot every 3 ticks. For the CI gate this means:
+
+```text
+50 matches
+× 900 ticks
+÷ 3 ticks per snapshot
+= 15,000 hashed/cloned authoritative snapshots
+```
+
+The smoke suite additionally repeats identical probes and requires identical final state hashes, so the load harness also protects deterministic state evolution.
+
 The load probe is a regression baseline, not a production capacity claim. Real capacity planning still requires deployed multi-process tests, real Socket.IO traffic, persistence, observability and target hardware measurements.
 
 ## Certification
