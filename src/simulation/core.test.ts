@@ -6,6 +6,7 @@ import { createSimulation, stepSimulation } from './core.ts';
 import { runDeterminismProbe } from './determinism.ts';
 import { hashSimulationState } from './hash.ts';
 import { buildSpatialHash, querySpatialHash } from './spatialHash.ts';
+import { CURRENT_AUTHORITATIVE_CONTENT } from '../shared/authoritativeContent.ts';
 
 const options = {
   seed: 0xC0FFEE,
@@ -213,4 +214,66 @@ test('recorded combat command fixture stays deterministic', () => {
   const probe = runDeterminismProbe(fixtureOptions, 500, combatFixtureCommands);
   assert.equal(probe.ok, true, 'fixture divergiu no tick ' + probe.firstDivergentTick);
   assert.equal(probe.hashA, probe.hashB);
+});
+
+
+test('published item purchase spends gold and applies stats authoritatively', () => {
+  const state = createSimulation(options);
+  const hero = state.entities['1'];
+  const damageBefore = hero.attackDamage;
+  stepSimulation(state, [{
+    type: 'buy',
+    playerId: 'blue-1',
+    seq: 1,
+    tick: 0,
+    itemId: 'longsword',
+  }]);
+  assert.deepEqual(hero.inventory, ['longsword']);
+  assert.equal(hero.gold, CURRENT_AUTHORITATIVE_CONTENT.payload.rules.startingGold - 350);
+  assert.equal(hero.attackDamage, damageBefore + 10);
+});
+
+test('item purchase is rejected outside the authoritative shop radius', () => {
+  const state = createSimulation(options);
+  const hero = state.entities['1'];
+  hero.x = hero.spawnX + CURRENT_AUTHORITATIVE_CONTENT.payload.rules.shopRadius + 50;
+  const goldBefore = hero.gold;
+  stepSimulation(state, [{
+    type: 'buy',
+    playerId: 'blue-1',
+    seq: 1,
+    tick: 0,
+    itemId: 'longsword',
+  }]);
+  assert.deepEqual(hero.inventory, []);
+  assert.equal(hero.gold, goldBefore);
+});
+
+test('Q runtime consumes published ability values instead of hidden constants', () => {
+  const published = structuredClone(CURRENT_AUTHORITATIVE_CONTENT.payload);
+  const gareth = published.heroes.find((hero) => hero.id === 'gareth');
+  assert.ok(gareth);
+  gareth.q.damageBase += 77;
+
+  const state = createSimulation({
+    ...options,
+    players: [
+      { playerId: 'blue-1', team: 0 as const, x: 1000, y: 1000, heroId: 'gareth' as const },
+      { playerId: 'red-1', team: 1 as const, x: 1060, y: 1000, heroId: 'luxana' as const },
+    ],
+  }, published);
+  const target = state.entities['2'];
+  const hpBefore = target.hp;
+  stepSimulation(state, [{
+    type: 'cast',
+    playerId: 'blue-1',
+    seq: 1,
+    tick: 0,
+    slot: 'Q',
+    targetId: 2,
+  }], published);
+
+  const expected = gareth.q.damageBase +
+    Math.trunc(state.entities['1'].attackDamage * gareth.q.damageAdPermille / 1000);
+  assert.equal(hpBefore - target.hp, expected);
 });
