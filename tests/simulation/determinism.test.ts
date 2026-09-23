@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { hashState } from '../../src/simulation/hash';
-import { Simulation } from '../../src/simulation/simulation';
-import type { InputCommand } from '../../src/shared/protocol';
+import { hashState } from '../../src/simulation/hash.js';
+import { Simulation } from '../../src/simulation/simulation.js';
+import type { InputCommand } from '../../src/shared/protocol.js';
 
 function run(seed: number, ticks: number): string[] {
   const sim = new Simulation(seed);
