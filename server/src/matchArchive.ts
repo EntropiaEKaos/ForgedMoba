@@ -21,7 +21,11 @@ export class MemoryMatchArchiveStore implements MatchArchiveStore {
 }
 
 export class FileMatchArchiveStore implements MatchArchiveStore {
-  constructor(private readonly directory: string) {}
+  private readonly directory: string;
+
+  constructor(directory: string) {
+    this.directory = directory;
+  }
 
   async save(record: MatchReplayRecord): Promise<void> {
     await mkdir(this.directory, { recursive: true });
