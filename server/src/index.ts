@@ -10,10 +10,11 @@ import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'crypto';
 import { Server as SocketServer, type Socket } from 'socket.io';
 import cors from 'cors';
 import jwt, { type JwtPayload } from 'jsonwebtoken';
-import type { PlayerCommand } from '../../src/shared/protocol.ts';
+import type { MatchMode, PlayerCommand } from '../../src/shared/protocol.ts';
 import { createContentManifest } from '../../src/shared/contentVersion.ts';
 import { SIM_TICK_RATE } from '../../src/simulation/index.ts';
 import { MatchRunner, stableSeedFromMatchId } from './matchRunner.ts';
+import { MatchmakingQueues, type MatchmakingEntry } from './matchmaking.ts';
 
 const PORT = Number(process.env.PORT || 3001);
 const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:5173';
@@ -42,10 +43,11 @@ interface DbUser {
   passwordSalt: string;
   level: number;
 }
-interface QueueEntry { userId: string; username: string; socketId: string; }
+interface QueueEntry extends MatchmakingEntry {}
 interface MatchPlayer extends QueueEntry { team: 0 | 1; slot: number; }
 interface ActiveMatch {
   id: string;
+  mode: MatchMode;
   players: MatchPlayer[];
   createdAt: number;
   runner: MatchRunner;
@@ -56,7 +58,7 @@ interface GameInputPayload { matchId?: unknown; command?: unknown; }
 const users = new Map<string, DbUser>();
 const usersByName = new Map<string, string>();
 const usersByEmail = new Map<string, string>();
-const queue: QueueEntry[] = [];
+const matchmaking = new MatchmakingQueues();
 const activeMatches = new Map<string, ActiveMatch>();
 
 const app = express();
@@ -109,8 +111,11 @@ function sign(user: DbUser): string {
   return jwt.sign({ userId: user.id, username: user.username }, JWT_SECRET, { expiresIn: '7d' });
 }
 function removeSocketFromQueue(socketId: string): void {
-  const index = queue.findIndex((entry) => entry.socketId === socketId);
-  if (index >= 0) queue.splice(index, 1);
+  matchmaking.leaveBySocket(socketId);
+}
+
+function parseMatchMode(value: unknown): MatchMode | null {
+  return value === 'duel1v1' || value === 'ranked5v5' ? value : null;
 }
 function socketIdentity(socket: Socket): AuthedSocketData { return socket.data as AuthedSocketData; }
 
@@ -134,6 +139,7 @@ function matchForUser(userId: string): { match: ActiveMatch; player: MatchPlayer
 function foundPayload(match: ActiveMatch, player: MatchPlayer) {
   return {
     matchId: match.id,
+    mode: match.mode,
     team: player.team,
     slot: player.slot,
     playerId: player.userId,
@@ -142,12 +148,13 @@ function foundPayload(match: ActiveMatch, player: MatchPlayer) {
   };
 }
 
-function createMatch(players: QueueEntry[]): ActiveMatch {
+function createMatch(players: QueueEntry[], mode: MatchMode): ActiveMatch {
   const id = randomUUID();
+  const teamSize = Math.max(1, players.length / 2);
   const assigned = players.map<MatchPlayer>((player, index) => ({
     ...player,
-    team: index < 5 ? 0 : 1,
-    slot: index % 5,
+    team: index < teamSize ? 0 : 1,
+    slot: index < teamSize ? index : index - teamSize,
   }));
   const runner = new MatchRunner({
     matchId: id,
@@ -168,7 +175,7 @@ function createMatch(players: QueueEntry[]): ActiveMatch {
       activeMatches.delete(id);
     },
   });
-  const match: ActiveMatch = { id, players: assigned, createdAt: Date.now(), runner };
+  const match: ActiveMatch = { id, mode, players: assigned, createdAt: Date.now(), runner };
   activeMatches.set(id, match);
 
   for (const player of assigned) {
@@ -191,7 +198,8 @@ app.get('/api/health', (_req, res) => {
     contentVersion: CONTENT_VERSION,
     tickRate: SIM_TICK_RATE,
     players: io.engine.clientsCount,
-    queueSize: queue.length,
+    queueSize: matchmaking.size('ranked5v5'),
+    duelQueueSize: matchmaking.size('duel1v1'),
     activeMatches: activeMatches.size,
   });
 });
@@ -268,13 +276,32 @@ io.on('connection', (socket) => {
 
   console.log('[socket] conectado: ' + identity.username + ' (' + socket.id + ')');
 
-  socket.on('queue:join', () => {
-    if (identity.matchId || queue.some((entry) => entry.socketId === socket.id)) return;
-    queue.push({ userId: identity.userId, username: identity.username, socketId: socket.id });
-    socket.emit('queue:joined', { position: queue.length, estimatedTime: Math.max(10, queue.length * 30) });
-    if (queue.length >= 10) {
-      const match = createMatch(queue.splice(0, 10));
-      console.log('[match] criada ' + match.id + ' com ' + match.players.length + ' jogadores; tick=' + SIM_TICK_RATE + 'Hz');
+  socket.on('queue:join', (payload?: { mode?: unknown }) => {
+    if (identity.matchId) return;
+    const mode = parseMatchMode(payload?.mode ?? 'ranked5v5');
+    if (!mode) {
+      socket.emit('game:error', { code: 'invalid-match-mode' });
+      return;
+    }
+
+    const joined = matchmaking.join(
+      { userId: identity.userId, username: identity.username, socketId: socket.id },
+      mode,
+    );
+    socket.emit('queue:joined', {
+      mode: joined.mode,
+      position: joined.position,
+      requiredPlayers: joined.requiredPlayers,
+      estimatedTime: Math.max(5, joined.position * (mode === 'duel1v1' ? 10 : 30)),
+    });
+
+    const ready = matchmaking.takeReady(mode);
+    if (ready) {
+      const match = createMatch(ready, mode);
+      console.log(
+        '[match] criada ' + match.id + ' mode=' + mode +
+        ' jogadores=' + match.players.length + '; tick=' + SIM_TICK_RATE + 'Hz',
+      );
     }
   });
 
