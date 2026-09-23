@@ -329,6 +329,24 @@ class ConnectionManager {
     this.emit();
   };
 
+  private onSessionRevoked = () => {
+    localStorage.removeItem(TOKEN_KEY);
+    this.lastNetworkError = 'session-revoked';
+    this.inQueue = false;
+    this.queuePos = null;
+    this.queueEta = 0;
+    this.queueMode = null;
+    this.queueRequiredPlayers = 0;
+    this.draft = null;
+    this.match = null;
+    this.matchResult = null;
+    this.resetNetworkMatchState();
+    this.user = { id: 'guest', username: 'Convidado', mode: 'guest' };
+    this.mode = 'guest';
+    localStorage.setItem(USER_KEY, JSON.stringify(this.user));
+    this.emit();
+  };
+
   private bindSocketEvents(socket: Socket) {
     socket.on('connect', this.onSocketConnect);
     socket.on('disconnect', this.onSocketDisconnect);
@@ -346,6 +364,7 @@ class ConnectionManager {
     socket.on('game:player-disconnected', this.onPlayerDisconnected);
     socket.on('game:player-reconnected', this.onPlayerReconnected);
     socket.on('session:replaced', this.onSessionReplaced);
+    socket.on('session:revoked', this.onSessionRevoked);
   }
 
   private unbindSocketEvents(socket: Socket) {
@@ -365,6 +384,7 @@ class ConnectionManager {
     socket.off('game:player-disconnected', this.onPlayerDisconnected);
     socket.off('game:player-reconnected', this.onPlayerReconnected);
     socket.off('session:replaced', this.onSessionReplaced);
+    socket.off('session:revoked', this.onSessionRevoked);
   }
 
   connectSocket(token?: string) {
@@ -503,6 +523,15 @@ class ConnectionManager {
   }
 
   logout() {
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (token && this.status === 'online') {
+      void fetch(`${API_URL}/api/auth/logout`, {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + token },
+      }).catch(() => {
+        // Local logout still proceeds if the revoke request cannot reach the server.
+      });
+    }
     this.disconnectSocket();
     localStorage.removeItem(TOKEN_KEY);
     this.inQueue = false;
