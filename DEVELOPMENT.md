@@ -82,7 +82,7 @@ The existing game is a feature-rich offline prototype. The migration strategy is
 - [x] match room membership and identity are cleaned on completion.
 - [x] branch CI + PR CI + post-merge main CI green on main @ e80131633d162f2ba6daae67c11344f723aee4c3.
 
-## Multiplayer 0.6 — current branch
+## Multiplayer 0.6 — certified and merged
 
 - [x] explicit `skirmish3v3` protocol mode.
 - [x] isolated six-player matchmaking queue with exact 3v3 readiness.
@@ -93,12 +93,25 @@ The existing game is a feature-rich offline prototype. The migration strategy is
 - [x] client HUD exposes reconnect grace and disconnected-player countdown.
 - [x] Duel 1v1 and Ranked 5v5 remain available alongside 3v3.
 - [x] unit tests cover reconnect expiry/cancel/cleanup and exact 3v3 matchmaking.
+- [x] branch CI + PR CI + post-merge main CI green on main @ 412d8b0b0b381591b240684c1ed28264c3b2f4c0.
+
+## Authoritative Content 0.7 — current branch
+
+- [x] validated authoritative content schema with deterministic publication hash.
+- [x] immutable published pack separated from browser-local Admin drafts.
+- [x] Gareth/Luxana authoritative base stats and Q values come from the published pack.
+- [x] initial authoritative item catalog with server-owned prices/stat effects.
+- [x] `buy` promoted into the authoritative command protocol.
+- [x] server validates shop radius, gold and inventory limit.
+- [x] client prediction/reconciliation supports purchases through the same simulation core.
+- [x] Socket.IO handshake and matchmaking declare the local content hash.
+- [x] server rejects mismatched client content before authoritative matchmaking.
+- [x] `/api/content/current` exposes the active published pack/manifest.
+- [x] Admin panel clearly distinguishes local drafts from published online authority.
+- [x] tests prove gameplay changes alter the content hash and published packs are immutable.
 - [ ] branch CI + PR CI + post-merge main CI certification.
 
 ## Multiplayer milestones
-
-- [ ] 0.7: abilities/items/content publishing bound to content hash.
-- [ ] 0.7: abilities/items/content publishing bound to content hash.
 - [ ] 0.8: jungle/objectives/wards under server authority.
 - [ ] 0.9: full draft/lobby and 5v5 load testing.
 - [ ] 1.0: production-ready authoritative 5v5 match architecture.

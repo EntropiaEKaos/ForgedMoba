@@ -6,8 +6,9 @@ import {
   saveAdminContent, type AdminContent, type AdminRecord,
 } from './content';
 import type { AdminTheme, GameModeDef, MapPresetDef } from './types';
+import { CURRENT_AUTHORITATIVE_CONTENT } from '../shared/authoritativeContent';
 
-type Tab = 'heroes' | 'items' | 'modes' | 'maps';
+type Tab = 'heroes' | 'items' | 'modes' | 'maps' | 'published';
 const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
 
 function Field({ label, value, onChange, type = 'text', min, max, step }: {
@@ -105,9 +106,9 @@ export function AdminPanel({ onClose, onContentChange }: { onClose: () => void; 
             <h1 className="font-pixel text-[12px] text-[#e2c45e]">PAINEL ADMIN</h1>
             <p className="text-[13px] text-[#718994]">Ctrl + Shift + A abre ou fecha este painel</p>
           </div>
-          {(['heroes', 'items', 'modes', 'maps'] as Tab[]).map(entry => (
+          {(['heroes', 'items', 'modes', 'maps', 'published'] as Tab[]).map(entry => (
             <button key={entry} onClick={() => setTab(entry)} className={`border-2 px-3 py-2 font-pixel text-[8px] uppercase ${tab === entry ? 'border-[#d8bb5b] bg-[#252719] text-[#f0dc87]' : 'border-[#263943] bg-[#101b23] text-[#81959d]'}`}>
-              {entry === 'heroes' ? 'Heróis' : entry === 'items' ? 'Itens' : entry === 'modes' ? 'Modos' : 'Mapas'}
+              {entry === 'heroes' ? 'Heróis' : entry === 'items' ? 'Itens' : entry === 'modes' ? 'Modos' : entry === 'maps' ? 'Mapas' : 'Publicado'}
             </button>
           ))}
           <button onClick={onClose} className="border-2 border-[#743739] bg-[#40191c] px-3 py-2 font-pixel text-[8px] text-[#ffb0a8]">Fechar</button>
@@ -251,6 +252,71 @@ export function AdminPanel({ onClose, onContentChange }: { onClose: () => void; 
                   <button onClick={() => persist({ ...content, activeModeId: modeDraft.id }, `${modeDraft.name} definido como modo ativo.`)} className="border-2 border-[#745d27] bg-[#302711] px-5 py-2 font-pixel text-[8px] text-[#f0dc87]">Definir ativo</button>
                   <button onClick={() => persist({ ...content, modes: content.modes.filter(mode => mode.id !== modeDraft.id), activeModeId: content.activeModeId === modeDraft.id ? content.modes[0]?.id ?? 'classic' : content.activeModeId }, 'Modo removido.')} className="border-2 border-[#743739] bg-[#40191c] px-5 py-2 font-pixel text-[8px] text-[#ffb0a8]">Excluir</button>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {tab === 'published' && (
+            <div className="space-y-4">
+              <div className="border-2 border-[#745d27] bg-[#17160f] p-5">
+                <h2 className="font-pixel text-[11px] text-[#e2c45e] mb-2">CONTEÚDO AUTORITATIVO PUBLICADO</h2>
+                <p className="text-[13px] text-[#9aaab0] max-w-4xl">
+                  Este pack é o único conteúdo aceito em partidas online nesta versão. Alterações salvas nas abas de Heróis/Itens continuam sendo drafts locais do protótipo e não ganham autoridade de servidor automaticamente.
+                </p>
+                <div className="mt-4 grid gap-3 md:grid-cols-3">
+                  <div className="border border-[#3d4528] bg-[#0d151c] p-3">
+                    <div className="text-[10px] uppercase text-[#6f8790]">Versão</div>
+                    <div className="font-mono text-[#e8d8b0]">{CURRENT_AUTHORITATIVE_CONTENT.manifest.version}</div>
+                  </div>
+                  <div className="border border-[#3d4528] bg-[#0d151c] p-3">
+                    <div className="text-[10px] uppercase text-[#6f8790]">Hash</div>
+                    <div className="font-mono text-[#80e0a0]">{CURRENT_AUTHORITATIVE_CONTENT.manifest.hash}</div>
+                  </div>
+                  <div className="border border-[#3d4528] bg-[#0d151c] p-3">
+                    <div className="text-[10px] uppercase text-[#6f8790]">Content Version</div>
+                    <div className="font-mono text-[12px] break-all text-[#8ac8ff]">{CURRENT_AUTHORITATIVE_CONTENT.contentVersion}</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-4 lg:grid-cols-2">
+                <div className="border border-[#263943] bg-[#101b23] p-4">
+                  <h3 className="font-pixel text-[9px] text-[#5ad0c0] mb-3">HERÓIS ONLINE</h3>
+                  <div className="space-y-2">
+                    {CURRENT_AUTHORITATIVE_CONTENT.payload.heroes.map(hero => (
+                      <div key={hero.id} className="border border-[#263943] bg-[#091117] p-3">
+                        <div className="font-mono text-[#e8d8b0]">{hero.id}</div>
+                        <div className="text-[12px] text-[#879ca5]">
+                          HP {hero.maxHp} · AD {hero.attackDamage} · range {hero.attackRange} · move/tick {hero.moveSpeedPerTick}
+                        </div>
+                        <div className="text-[12px] text-[#c5b56f]">
+                          Q {hero.q.runtime} · dano {hero.q.damageBase} + {hero.q.damageAdPermille / 10}% AD · CD {hero.q.cooldownTicks} ticks
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="border border-[#263943] bg-[#101b23] p-4">
+                  <h3 className="font-pixel text-[9px] text-[#5ad0c0] mb-3">ITENS ONLINE</h3>
+                  <div className="space-y-2">
+                    {CURRENT_AUTHORITATIVE_CONTENT.payload.items.map(item => (
+                      <div key={item.id} className="border border-[#263943] bg-[#091117] p-3">
+                        <div className="flex justify-between gap-3">
+                          <span className="font-mono text-[#e8d8b0]">{item.name} ({item.id})</span>
+                          <span className="text-[#e8c860]">{item.cost}g</span>
+                        </div>
+                        <div className="text-[12px] text-[#879ca5]">
+                          {Object.entries(item.stats).map(([key, value]) => key + ' +' + value).join(' · ')}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="border border-[#384b55] bg-[#0c151d] p-4 text-[12px] text-[#91a6af]">
+                <b className="text-[#ffcf7a]">Pipeline seguro:</b> draft local → revisão/validação → pack publicado → hash novo → clientes e servidor precisam carregar exatamente o mesmo hash. Uma futura API administrativa protegida poderá automatizar a etapa de publicação sem dar autoridade ao navegador.
               </div>
             </div>
           )}

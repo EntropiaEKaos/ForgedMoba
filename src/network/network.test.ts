@@ -94,3 +94,21 @@ test('telemetry tracks RTT jitter snapshot gaps and correction distance', () => 
   assert.equal(metrics.skippedSnapshotWindows, 1);
   assert.equal(metrics.correctionDistance, 7.5);
 });
+
+
+test('prediction applies published item buys and later reconciles the server acknowledgement', () => {
+  const state = baseState();
+  const prediction = new ClientPrediction('blue');
+  prediction.acceptSnapshot(snapshot(state));
+  const command = { type: 'buy', playerId: 'blue', seq: 1, tick: 0, itemId: 'longsword' } as const;
+  prediction.record(command);
+
+  const predicted = prediction.predictThrough(0);
+  assert.deepEqual(predicted?.entities['1'].inventory, ['longsword']);
+
+  const server = baseState();
+  stepSimulation(server, [command]);
+  const result = prediction.acceptSnapshot(snapshot(server, 1), server.tick - 1);
+  assert.equal(result.pendingCommands, 0);
+  assert.deepEqual(prediction.predictThrough(server.tick - 1)?.entities['1'].inventory, ['longsword']);
+});

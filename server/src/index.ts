@@ -11,7 +11,7 @@ import { Server as SocketServer, type Socket } from 'socket.io';
 import cors from 'cors';
 import jwt, { type JwtPayload } from 'jsonwebtoken';
 import type { MatchMode, PlayerCommand } from '../../src/shared/protocol.ts';
-import { createContentManifest } from '../../src/shared/contentVersion.ts';
+import { CURRENT_AUTHORITATIVE_CONTENT } from '../../src/shared/authoritativeContent.ts';
 import { SIM_TICK_RATE } from '../../src/simulation/index.ts';
 import { MatchRunner, stableSeedFromMatchId } from './matchRunner.ts';
 import { MatchmakingQueues, type MatchmakingEntry } from './matchmaking.ts';
@@ -19,15 +19,12 @@ import { ReconnectGraceRegistry } from './reconnectGrace.ts';
 
 const PORT = Number(process.env.PORT || 3001);
 const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:5173';
-const SERVER_VERSION = '2.5.0';
+const SERVER_VERSION = '2.6.0';
 const RECONNECT_GRACE_MS = 30_000;
-const CONTENT_MANIFEST = createContentManifest('core-0.3', {
-  simulationVersion: 3,
-  tickRate: SIM_TICK_RATE,
-  mode: 'single-lane-authority-v2',
-  minionWaveSeconds: 30,
-});
-const CONTENT_VERSION = CONTENT_MANIFEST.version + '+' + CONTENT_MANIFEST.hash;
+const CONTENT_VERSION = CURRENT_AUTHORITATIVE_CONTENT.contentVersion;
+if (CURRENT_AUTHORITATIVE_CONTENT.payload.rules.tickRate !== SIM_TICK_RATE) {
+  throw new Error('Published content tickRate does not match simulation tickRate.');
+}
 
 function resolveJwtSecret(): string {
   const configured = process.env.JWT_SECRET;
@@ -164,6 +161,7 @@ function createMatch(players: QueueEntry[], mode: MatchMode): ActiveMatch {
     matchId: id,
     contentVersion: CONTENT_VERSION,
     seed: stableSeedFromMatchId(id),
+    content: CURRENT_AUTHORITATIVE_CONTENT,
     players: assigned.map((player) => ({ playerId: player.userId, team: player.team, slot: player.slot })),
     onSnapshot: (snapshot) => io.to(id).emit('game:snapshot', snapshot),
     onComplete: (state) => {
@@ -197,6 +195,10 @@ function createMatch(players: QueueEntry[], mode: MatchMode): ActiveMatch {
   runner.start();
   return match;
 }
+
+app.get('/api/content/current', (_req, res) => {
+  res.json(CURRENT_AUTHORITATIVE_CONTENT);
+});
 
 app.get('/api/health', (_req, res) => {
   res.json({
@@ -272,7 +274,9 @@ app.post('/api/auth/login', authRateLimit, (req, res) => {
 io.use((socket, next) => {
   try {
     const token = socket.handshake.auth?.token;
+    const clientContentVersion = socket.handshake.auth?.contentVersion;
     if (typeof token !== 'string' || token.length === 0) return next(new Error('unauthorized'));
+    if (clientContentVersion !== CONTENT_VERSION) return next(new Error('content-version-mismatch'));
     const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload & { userId?: string };
     if (typeof decoded.userId !== 'string') return next(new Error('unauthorized'));
     const user = users.get(decoded.userId);
@@ -327,8 +331,12 @@ io.on('connection', (socket) => {
 
   console.log('[socket] conectado: ' + identity.username + ' (' + socket.id + ')');
 
-  socket.on('queue:join', (payload?: { mode?: unknown }) => {
+  socket.on('queue:join', (payload?: { mode?: unknown; contentVersion?: unknown }) => {
     if (identity.matchId) return;
+    if (payload?.contentVersion !== CONTENT_VERSION) {
+      socket.emit('game:error', { code: 'content-version-mismatch' });
+      return;
+    }
     const mode = parseMatchMode(payload?.mode ?? 'ranked5v5');
     if (!mode) {
       socket.emit('game:error', { code: 'invalid-match-mode' });

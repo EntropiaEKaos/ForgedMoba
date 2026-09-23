@@ -2,12 +2,13 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { AuthoritativeSnapshot } from '../../src/shared/protocol.ts';
 import type { SimulationState } from '../../src/simulation/index.ts';
+import { CURRENT_AUTHORITATIVE_CONTENT } from '../../src/shared/authoritativeContent.ts';
 import { MatchRunner, stableSeedFromMatchId } from './matchRunner.ts';
 
 function createRunner(onSnapshot?: (snapshot: AuthoritativeSnapshot<SimulationState>) => void) {
   return new MatchRunner({
     matchId: 'match-test-001',
-    contentVersion: 'core-0.2+deadbeef',
+    contentVersion: CURRENT_AUTHORITATIVE_CONTENT.contentVersion,
     seed: stableSeedFromMatchId('match-test-001'),
     snapshotEveryTicks: 3,
     players: [
@@ -66,7 +67,7 @@ test('1v1 forfeit is server authoritative and completes with the opponent winner
   let completedWinner: 0 | 1 | null = null;
   const runner = new MatchRunner({
     matchId: 'duel-forfeit',
-    contentVersion: 'core-0.3+test',
+    contentVersion: CURRENT_AUTHORITATIVE_CONTENT.contentVersion,
     seed: stableSeedFromMatchId('duel-forfeit'),
     players: [
       { playerId: 'blue-1', team: 0, slot: 0 },
@@ -86,7 +87,7 @@ test('team-level forfeit completes a 3v3 match with the opposite team winner', (
   let completedWinner: 0 | 1 | null = null;
   const runner = new MatchRunner({
     matchId: 'skirmish-team-forfeit',
-    contentVersion: 'core-0.3+test',
+    contentVersion: CURRENT_AUTHORITATIVE_CONTENT.contentVersion,
     seed: stableSeedFromMatchId('skirmish-team-forfeit'),
     players: [
       { playerId: 'b1', team: 0, slot: 0 },
@@ -102,4 +103,40 @@ test('team-level forfeit completes a 3v3 match with the opposite team winner', (
   assert.equal(runner.state.winner, 0);
   assert.equal(completedWinner, 0);
   assert.equal(runner.forfeitTeam(1), false);
+});
+
+
+test('runner rejects a content version that does not match its published pack', () => {
+  assert.throws(
+    () => new MatchRunner({
+      matchId: 'bad-content',
+      contentVersion: 'wrong+deadbeef',
+      seed: 1,
+      players: [
+        { playerId: 'blue-1', team: 0, slot: 0 },
+        { playerId: 'red-1', team: 1, slot: 0 },
+      ],
+    }),
+    /content mismatch/,
+  );
+});
+
+test('runner accepts authoritative buy commands and applies published item stats', () => {
+  const runner = createRunner();
+  const hero = runner.state.entities['1'];
+  const beforeDamage = hero.attackDamage;
+  assert.deepEqual(
+    runner.enqueue('blue-1', {
+      type: 'buy',
+      playerId: 'spoof',
+      seq: 1,
+      tick: 0,
+      itemId: 'longsword',
+    }),
+    { ok: true },
+  );
+  runner.advanceOneTick();
+  assert.deepEqual(hero.inventory, ['longsword']);
+  assert.equal(hero.gold, CURRENT_AUTHORITATIVE_CONTENT.payload.rules.startingGold - 350);
+  assert.equal(hero.attackDamage, beforeDamage + 10);
 });

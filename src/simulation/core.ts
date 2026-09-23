@@ -1,4 +1,10 @@
 import type { CoreSimulationCommand, EntityId, PlayerId } from '../shared/protocol.ts';
+import {
+  CURRENT_AUTHORITATIVE_CONTENT,
+  authoritativeHero,
+  authoritativeItem,
+  type AuthoritativeContentPayload,
+} from '../shared/authoritativeContent.ts';
 import { normalizeSeed, rollPermille } from './rng.ts';
 import { buildSpatialHash, querySpatialHash, type SpatialHash } from './spatialHash.ts';
 import {
@@ -17,16 +23,6 @@ import {
 const DEFAULT_WIDTH = 3000;
 const DEFAULT_HEIGHT = 3000;
 const LANE_Y_RATIO = 0.5;
-
-const HERO_HP = 650;
-const HERO_ATTACK_DAMAGE = 64;
-const HERO_ATTACK_RANGE = 72;
-const HERO_ATTACK_COOLDOWN_TICKS = 24;
-const HERO_MOVE_SPEED_PER_TICK = 4;
-const HERO_CRIT_CHANCE_PERMILLE = 100;
-const HERO_RESPAWN_TICKS = 150;
-const HERO_KILL_GOLD = 300;
-const HERO_KILL_XP = 120;
 
 const TOWER_HP = 1800;
 const TOWER_ATTACK_DAMAGE = 95;
@@ -49,18 +45,6 @@ const WAVE_SIZE = 3;
 const SPATIAL_CELL_SIZE = 128;
 const XP_SHARE_RADIUS = 500;
 const UNIT_SEPARATION_PADDING = 2;
-
-const GARETH_Q_RANGE = 118;
-const GARETH_Q_DAMAGE = 96;
-const GARETH_Q_COOLDOWN = 120;
-const GARETH_Q_SLOW_TICKS = 45;
-const GARETH_Q_SLOW_PERMILLE = 250;
-
-const LUXANA_Q_RANGE = 430;
-const LUXANA_Q_HALF_WIDTH = 34;
-const LUXANA_Q_DAMAGE = 105;
-const LUXANA_Q_COOLDOWN = 180;
-const LUXANA_Q_ROOT_TICKS = 45;
 
 const EMPTY_COOLDOWNS = (): Record<SimAbilitySlot, number> => ({ Q: 0, W: 0, E: 0, R: 0 });
 
@@ -98,19 +82,26 @@ function baseEntityFields() {
     abilityCooldowns: EMPTY_COOLDOWNS(),
     statuses: [] as SimStatus[],
     towerAggroUntilTick: 0,
+    inventory: [] as string[],
   };
 }
 
-function createHero(state: SimulationState, player: CreateSimulationOptions['players'][number]): SimEntity {
+function createHero(
+  state: SimulationState,
+  player: CreateSimulationOptions['players'][number],
+  content: AuthoritativeContentPayload,
+): SimEntity {
   const id: EntityId = state.nextEntityId++;
   const x = clampInt(player.x, 0, state.width);
   const y = clampInt(player.y, 0, state.height);
+  const heroId = heroIdFor(player);
+  const publishedHero = authoritativeHero(heroId, content);
   return {
     id,
     kind: 'hero',
     team: player.team,
     ownerPlayerId: player.playerId,
-    heroId: heroIdFor(player),
+    heroId,
     x,
     y,
     spawnX: x,
@@ -118,23 +109,23 @@ function createHero(state: SimulationState, player: CreateSimulationOptions['pla
     radius: 16,
     moveTarget: null,
     attackTargetId: null,
-    hp: HERO_HP,
-    maxHp: HERO_HP,
-    attackDamage: HERO_ATTACK_DAMAGE,
-    attackRange: HERO_ATTACK_RANGE,
-    attackCooldownTicks: HERO_ATTACK_COOLDOWN_TICKS,
+    hp: publishedHero.maxHp,
+    maxHp: publishedHero.maxHp,
+    attackDamage: publishedHero.attackDamage,
+    attackRange: publishedHero.attackRange,
+    attackCooldownTicks: publishedHero.attackCooldownTicks,
     attackCooldownRemaining: 0,
     ...baseEntityFields(),
-    moveSpeedPerTick: HERO_MOVE_SPEED_PER_TICK,
-    critChancePermille: HERO_CRIT_CHANCE_PERMILLE,
+    moveSpeedPerTick: publishedHero.moveSpeedPerTick,
+    critChancePermille: publishedHero.critChancePermille,
     aggroRange: 0,
     dead: false,
     respawnAtTick: null,
-    bountyGold: HERO_KILL_GOLD,
-    xpBounty: HERO_KILL_XP,
+    bountyGold: content.rules.heroKillGold,
+    xpBounty: content.rules.heroKillXp,
     level: 1,
     xp: 0,
-    gold: 475,
+    gold: content.rules.startingGold,
     cs: 0,
   };
 }
@@ -325,13 +316,18 @@ function awardKill(state: SimulationState, attacker: SimEntity, victim: SimEntit
   if (victim.kind === 'hero') state.score[attacker.team] += 1;
 }
 
-function killEntity(state: SimulationState, victim: SimEntity, attacker: SimEntity): void {
+function killEntity(
+  state: SimulationState,
+  victim: SimEntity,
+  attacker: SimEntity,
+  content: AuthoritativeContentPayload,
+): void {
   victim.hp = 0;
   victim.dead = true;
   victim.moveTarget = null;
   victim.attackTargetId = null;
   victim.statuses = [];
-  victim.respawnAtTick = victim.kind === 'hero' ? state.tick + HERO_RESPAWN_TICKS : null;
+  victim.respawnAtTick = victim.kind === 'hero' ? state.tick + content.rules.heroRespawnTicks : null;
   awardKill(state, attacker, victim);
   if (victim.kind === 'tower') state.winner = attacker.team;
 }
@@ -346,14 +342,20 @@ function markTowerAggro(state: SimulationState, attacker: SimEntity, victim: Sim
   }
 }
 
-function dealDamage(state: SimulationState, attacker: SimEntity, victim: SimEntity, amount: number): void {
+function dealDamage(
+  state: SimulationState,
+  attacker: SimEntity,
+  victim: SimEntity,
+  amount: number,
+  content: AuthoritativeContentPayload,
+): void {
   if (!validEnemy(attacker, victim) || amount <= 0) return;
   markTowerAggro(state, attacker, victim);
   victim.hp = Math.max(0, victim.hp - Math.max(0, Math.trunc(amount)));
-  if (victim.hp === 0) killEntity(state, victim, attacker);
+  if (victim.hp === 0) killEntity(state, victim, attacker, content);
 }
 
-function tryAttack(state: SimulationState, attacker: SimEntity): void {
+function tryAttack(state: SimulationState, attacker: SimEntity, content: AuthoritativeContentPayload): void {
   if (
     attacker.dead ||
     attacker.attackTargetId === null ||
@@ -371,7 +373,7 @@ function tryAttack(state: SimulationState, attacker: SimEntity): void {
 
   const crit = rollPermille(state.rngState, attacker.critChancePermille);
   state.rngState = crit.state;
-  dealDamage(state, attacker, target, crit.hit ? attacker.attackDamage * 2 : attacker.attackDamage);
+  dealDamage(state, attacker, target, crit.hit ? attacker.attackDamage * 2 : attacker.attackDamage, content);
   attacker.attackCooldownRemaining = attacker.attackCooldownTicks;
 }
 
@@ -540,39 +542,54 @@ function pointSegmentDistanceSquared(px: number, py: number, ax: number, ay: num
   return dx * dx + dy * dy;
 }
 
-function castGarethQ(state: SimulationState, caster: SimEntity, targetId: EntityId | undefined): boolean {
+function castGarethQ(
+  state: SimulationState,
+  caster: SimEntity,
+  targetId: EntityId | undefined,
+  content: AuthoritativeContentPayload,
+): boolean {
   if (!targetId) return false;
   const target = state.entities[String(targetId)];
   if (!validEnemy(caster, target)) return false;
-  const range = GARETH_Q_RANGE + target.radius;
+  const q = authoritativeHero('gareth', content).q;
+  const range = q.range + target.radius;
   if (squaredDistance(caster, target) > range * range) return false;
 
-  dealDamage(state, caster, target, GARETH_Q_DAMAGE + Math.trunc(caster.attackDamage * 0.5));
+  const damage = q.damageBase + Math.trunc(caster.attackDamage * q.damageAdPermille / 1000);
+  dealDamage(state, caster, target, damage, content);
   if (!target.dead) {
     upsertStatus(target, {
-      kind: 'slow',
+      kind: q.statusKind,
       sourceId: caster.id,
-      expiresAtTick: state.tick + GARETH_Q_SLOW_TICKS,
-      magnitudePermille: GARETH_Q_SLOW_PERMILLE,
+      expiresAtTick: state.tick + q.statusTicks,
+      magnitudePermille: q.statusMagnitudePermille,
     });
   }
-  caster.abilityCooldowns.Q = GARETH_Q_COOLDOWN;
+  caster.abilityCooldowns.Q = q.cooldownTicks;
   return true;
 }
 
-function castLuxanaQ(state: SimulationState, caster: SimEntity, x: number | undefined, y: number | undefined): boolean {
+function castLuxanaQ(
+  state: SimulationState,
+  caster: SimEntity,
+  x: number | undefined,
+  y: number | undefined,
+  content: AuthoritativeContentPayload,
+): boolean {
   if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
   const direction = normalizedDirection(caster, Number(x), Number(y));
   if (!direction) return false;
 
-  const endX = caster.x + direction.x * LUXANA_Q_RANGE;
-  const endY = caster.y + direction.y * LUXANA_Q_RANGE;
+  const q = authoritativeHero('luxana', content).q;
+  const endX = caster.x + direction.x * q.range;
+  const endY = caster.y + direction.y * q.range;
+  const halfWidth = q.lineHalfWidth ?? 1;
   const candidates = Object.values(state.entities)
     .filter((target) =>
       validEnemy(caster, target) &&
       target.kind !== 'tower' &&
       pointSegmentDistanceSquared(target.x, target.y, caster.x, caster.y, endX, endY) <=
-        (LUXANA_Q_HALF_WIDTH + target.radius) ** 2,
+        (halfWidth + target.radius) ** 2,
     )
     .sort((a, b) => {
       const da = squaredDistance(caster, a);
@@ -582,20 +599,26 @@ function castLuxanaQ(state: SimulationState, caster: SimEntity, x: number | unde
 
   const target = candidates[0];
   if (!target) return false;
-  dealDamage(state, caster, target, LUXANA_Q_DAMAGE);
+  const damage = q.damageBase + Math.trunc(caster.attackDamage * q.damageAdPermille / 1000);
+  dealDamage(state, caster, target, damage, content);
   if (!target.dead) {
     upsertStatus(target, {
-      kind: 'root',
+      kind: q.statusKind,
       sourceId: caster.id,
-      expiresAtTick: state.tick + LUXANA_Q_ROOT_TICKS,
-      magnitudePermille: 1000,
+      expiresAtTick: state.tick + q.statusTicks,
+      magnitudePermille: q.statusMagnitudePermille,
     });
   }
-  caster.abilityCooldowns.Q = LUXANA_Q_COOLDOWN;
+  caster.abilityCooldowns.Q = q.cooldownTicks;
   return true;
 }
 
-function castQ(state: SimulationState, caster: SimEntity, command: Extract<CoreSimulationCommand, { type: 'cast' }>): void {
+function castQ(
+  state: SimulationState,
+  caster: SimEntity,
+  command: Extract<CoreSimulationCommand, { type: 'cast' }>,
+  content: AuthoritativeContentPayload,
+): void {
   if (
     caster.kind !== 'hero' ||
     caster.dead ||
@@ -604,11 +627,39 @@ function castQ(state: SimulationState, caster: SimEntity, command: Extract<CoreS
     command.slot !== 'Q'
   ) return;
 
-  if (caster.heroId === 'gareth') castGarethQ(state, caster, command.targetId);
-  else if (caster.heroId === 'luxana') castLuxanaQ(state, caster, command.x, command.y);
+  if (caster.heroId === 'gareth') castGarethQ(state, caster, command.targetId, content);
+  else if (caster.heroId === 'luxana') castLuxanaQ(state, caster, command.x, command.y, content);
 }
 
-function applyCommand(state: SimulationState, command: CoreSimulationCommand): void {
+function buyItem(
+  entity: SimEntity,
+  itemId: string,
+  content: AuthoritativeContentPayload,
+): void {
+  if (entity.kind !== 'hero' || entity.dead) return;
+  const item = authoritativeItem(itemId, content);
+  if (!item) return;
+  if (entity.inventory.length >= content.rules.maxInventorySlots) return;
+  const dx = entity.x - entity.spawnX;
+  const dy = entity.y - entity.spawnY;
+  if (dx * dx + dy * dy > content.rules.shopRadius * content.rules.shopRadius) return;
+  if (entity.gold < item.cost) return;
+
+  entity.gold -= item.cost;
+  entity.inventory.push(item.id);
+  if (item.stats.attackDamage) entity.attackDamage += item.stats.attackDamage;
+  if (item.stats.maxHp) {
+    entity.maxHp += item.stats.maxHp;
+    entity.hp += item.stats.maxHp;
+  }
+  if (item.stats.moveSpeedPerTick) entity.moveSpeedPerTick += item.stats.moveSpeedPerTick;
+}
+
+function applyCommand(
+  state: SimulationState,
+  command: CoreSimulationCommand,
+  content: AuthoritativeContentPayload,
+): void {
   if (!acceptCommand(state, command)) return;
   const entity = entityByPlayer(state, command.playerId);
   if (!entity || entity.dead) return;
@@ -634,17 +685,23 @@ function applyCommand(state: SimulationState, command: CoreSimulationCommand): v
       entity.attackTargetId = null;
       break;
     case 'cast':
-      castQ(state, entity, command);
+      castQ(state, entity, command, content);
+      break;
+    case 'buy':
+      buyItem(entity, command.itemId, content);
       break;
   }
 }
 
-export function createSimulation(options: CreateSimulationOptions): SimulationState {
+export function createSimulation(
+  options: CreateSimulationOptions,
+  content: AuthoritativeContentPayload = CURRENT_AUTHORITATIVE_CONTENT.payload,
+): SimulationState {
   const width = clampInt(options.width ?? DEFAULT_WIDTH, 512, 100_000);
   const height = clampInt(options.height ?? DEFAULT_HEIGHT, 512, 100_000);
   const state: SimulationState = {
     version: 3,
-    contentVersion: options.contentVersion?.trim() || 'core-0.3-dev',
+    contentVersion: options.contentVersion?.trim() || CURRENT_AUTHORITATIVE_CONTENT.contentVersion,
     tick: 0,
     seed: normalizeSeed(options.seed),
     rngState: normalizeSeed(options.seed),
@@ -666,7 +723,7 @@ export function createSimulation(options: CreateSimulationOptions): SimulationSt
       throw new Error('playerId inválido ou duplicado: ' + player.playerId);
     }
     seenPlayers.add(player.playerId);
-    const hero = createHero(state, player);
+    const hero = createHero(state, player, content);
     state.entities[String(hero.id)] = hero;
     state.lastAcceptedSeq[player.playerId] = -1;
   }
@@ -679,7 +736,11 @@ export function createSimulation(options: CreateSimulationOptions): SimulationSt
 }
 
 /** Executa exatamente um tick autoritativo, sem relógio, DOM, rede ou Math.random(). */
-export function stepSimulation(state: SimulationState, commands: readonly CoreSimulationCommand[]): void {
+export function stepSimulation(
+  state: SimulationState,
+  commands: readonly CoreSimulationCommand[],
+  content: AuthoritativeContentPayload = CURRENT_AUTHORITATIVE_CONTENT.payload,
+): void {
   if (state.winner !== null) return;
 
   maybeSpawnWave(state);
@@ -688,7 +749,7 @@ export function stepSimulation(state: SimulationState, commands: readonly CoreSi
     const playerOrder = compareText(a.playerId, b.playerId);
     return playerOrder !== 0 ? playerOrder : a.seq - b.seq;
   });
-  for (const command of ordered) applyCommand(state, command);
+  for (const command of ordered) applyCommand(state, command, content);
 
   let index = buildSpatialHash(state.entities, SPATIAL_CELL_SIZE);
   const ids = Object.keys(state.entities).map(Number).sort((a, b) => a - b);
@@ -713,7 +774,7 @@ export function stepSimulation(state: SimulationState, commands: readonly CoreSi
     if (!entity || entity.dead) continue;
     if (entity.kind === 'minion') updateMinionAI(state, index, entity);
     else if (entity.kind === 'tower') updateTowerAI(state, index, entity);
-    tryAttack(state, entity);
+    tryAttack(state, entity, content);
     if (state.winner !== null) break;
   }
 

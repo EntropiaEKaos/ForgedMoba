@@ -10,6 +10,7 @@ import type {
   MatchFoundPayload,
   MatchMode,
 } from '../shared/protocol.ts';
+import { CURRENT_AUTHORITATIVE_CONTENT } from '../shared/authoritativeContent.ts';
 import type { SimulationState } from '../simulation/types.ts';
 import { SnapshotInterpolationBuffer, type InterpolatedFrame } from './interpolation.ts';
 import { ClientPrediction } from './prediction.ts';
@@ -29,6 +30,7 @@ const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3001
 const WS_URL = (import.meta as any).env?.VITE_WS_URL || 'http://localhost:3001';
 const TOKEN_KEY = 'pixelrift_token';
 const USER_KEY = 'pixelrift_user';
+export const LOCAL_CONTENT_VERSION = CURRENT_AUTHORITATIVE_CONTENT.contentVersion;
 
 type Listener = () => void;
 type StripCommandEnvelope<T> = T extends unknown ? Omit<T, 'playerId' | 'seq' | 'tick'> : never;
@@ -122,6 +124,9 @@ class ConnectionManager {
         skirmishQueueSize: data.skirmishQueueSize,
         reconnectGraceMs: data.reconnectGraceMs,
       };
+      if (data.contentVersion && data.contentVersion !== LOCAL_CONTENT_VERSION) {
+        this.lastNetworkError = 'content-version-mismatch';
+      }
       return true;
     } catch {
       return false;
@@ -320,7 +325,7 @@ class ConnectionManager {
 
     this.lastNetworkError = null;
     const socket = io(WS_URL, {
-      auth: { token },
+      auth: { token, contentVersion: LOCAL_CONTENT_VERSION },
       reconnection: true,
       timeout: 5000,
       transports: ['websocket', 'polling'],
@@ -465,6 +470,11 @@ class ConnectionManager {
 
   joinQueue(mode: MatchMode = 'ranked5v5') {
     if (!this.isOnline || !this.socket || this.user?.mode !== 'account') return;
+    if (this.serverInfo?.contentVersion !== LOCAL_CONTENT_VERSION) {
+      this.lastNetworkError = 'content-version-mismatch';
+      this.emit();
+      return;
+    }
     this.match = null;
     this.matchResult = null;
     this.resetNetworkMatchState();
@@ -474,7 +484,7 @@ class ConnectionManager {
     this.queueRequiredPlayers = mode === 'duel1v1' ? 2 : mode === 'skirmish3v3' ? 6 : 10;
     this.queuePos = 0;
     this.emit();
-    this.socket.emit('queue:join', { mode });
+    this.socket.emit('queue:join', { mode, contentVersion: LOCAL_CONTENT_VERSION });
   }
 
   leaveQueue() {
@@ -537,6 +547,10 @@ class ConnectionManager {
 
   sendStop() {
     return this.emitGameCommand({ type: 'stop' });
+  }
+
+  sendBuy(itemId: string) {
+    return this.emitGameCommand({ type: 'buy', itemId });
   }
 
   sendCastQ(target: { x?: number; y?: number; targetId?: number }) {
