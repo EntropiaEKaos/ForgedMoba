@@ -44,7 +44,7 @@ The existing game is a feature-rich offline prototype. The migration strategy is
 - [x] client stores authoritative snapshots and can emit move/attack/stop commands.
 - [x] GitHub branch CI + PR CI + post-merge CI certified the merged phase.
 
-## Combat / Lane parity 0.3 — current branch
+## Combat / Lane parity 0.3 — certified and merged
 
 - [x] client transport adapter for authoritative Q commands.
 - [x] deterministic unit separation and world-bound movement constraints.
@@ -54,16 +54,20 @@ The existing game is a feature-rich offline prototype. The migration strategy is
 - [x] deterministic lane XP sharing between nearby allied heroes.
 - [x] command-log fixture for reproduced combat scenarios.
 - [x] MatchRunner accepts Q while continuing to reject unsupported W/E/R authority.
-- [ ] branch CI + PR CI + post-merge CI certification.
+- [x] branch CI + PR CI + post-merge CI green on main @ 50c4ff6622ac69bd07e2b344b9e7f42018131924.
 
-## Network Client 0.4
+## Network Client 0.4 — current branch
 
-- [ ] local movement prediction.
-- [ ] reconciliation from server input acknowledgements.
-- [ ] interpolation buffer for remote entities.
-- [ ] latency/jitter/loss telemetry.
-- [ ] online match screen driven from authoritative snapshots.
-- [ ] disconnect/reconnect UX.
+- [x] local prediction reusing the deterministic authoritative simulation.
+- [x] reconciliation from server input acknowledgements with pending-input replay.
+- [x] interpolation buffer for remote entity position/HP.
+- [x] RTT/jitter/snapshot-gap/correction telemetry.
+- [x] online authoritative match screen separated from the legacy offline renderer.
+- [x] reconnect resumes an active in-memory match and sends a fresh authoritative snapshot.
+- [x] network client regression suite added to CI.
+- [x] content manifest advanced to simulation v3/core-0.3.
+- [ ] branch CI + PR CI + post-merge main CI certification.
+- [ ] follow-up security/dependency audit for the npm vulnerabilities surfaced by CI; no forced upgrade will be merged without compatibility verification.
 
 ## Multiplayer milestones
 
