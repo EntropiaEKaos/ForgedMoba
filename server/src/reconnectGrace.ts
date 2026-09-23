@@ -49,6 +49,13 @@ export class ReconnectGraceRegistry {
     return lease ? { ...lease } : null;
   }
 
+  forMatch(matchId: string): ReconnectLease[] {
+    return [...this.leases.values()]
+      .filter((lease) => lease.matchId === matchId)
+      .sort((a, b) => a.expiresAt - b.expiresAt || a.playerId.localeCompare(b.playerId))
+      .map((lease) => ({ ...lease }));
+  }
+
   get size(): number {
     return this.leases.size;
   }
