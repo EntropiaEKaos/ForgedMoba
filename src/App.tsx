@@ -13,6 +13,7 @@ import { DraftScreen } from './screens/DraftScreen';
 import { AdminPanel } from './admin/AdminPanel';
 import { RunesModal } from './screens/RunesModal';
 import { OnlineMatchScreen } from './screens/OnlineMatchScreen';
+import { RankedDraftScreen } from './screens/RankedDraftScreen';
 import { getActiveRules, initializeAdminContent, type AdminContent } from './admin/content';
 
 // ================= BADGE DE STATUS ONLINE =================
@@ -1516,7 +1517,7 @@ function Match({ heroId, summoners, profile, onMatchEnd, onPlayAgain, onExit }: 
 }
 
 export default function App() {
-  const { match: onlineMatch } = useConnection();
+  const { match: onlineMatch, draft: onlineDraft } = useConnection();
   const [profile, setProfile] = useState<Profile>(() => loadProfile());
   const [match, setMatch] = useState<{ heroId: string; summoners: string[] } | null>(null);
   const [drafting, setDrafting] = useState(false);
@@ -1552,6 +1553,8 @@ export default function App() {
     }} />;
   } else if (onlineMatch) {
     screen = <OnlineMatchScreen />;
+  } else if (onlineDraft) {
+    screen = <RankedDraftScreen />;
   } else if (match) {
     screen = <Match key={gameKey} heroId={match.heroId} summoners={match.summoners} profile={profile}
       onMatchEnd={(_rec, p) => setProfile(p)}
