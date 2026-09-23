@@ -553,6 +553,10 @@ class ConnectionManager {
     return this.emitGameCommand({ type: 'buy', itemId });
   }
 
+  sendPlaceWard(x: number, y: number) {
+    return this.emitGameCommand({ type: 'place-ward', x, y });
+  }
+
   sendCastQ(target: { x?: number; y?: number; targetId?: number }) {
     return this.emitGameCommand({
       type: 'cast',

@@ -5,7 +5,7 @@ export const SIM_TICK_MS = 1000 / SIM_TICK_RATE;
 export const WAVE_INTERVAL_TICKS = SIM_TICK_RATE * 30;
 
 export type SimTeam = 0 | 1;
-export type SimEntityKind = 'hero' | 'minion' | 'tower';
+export type SimEntityKind = 'hero' | 'minion' | 'tower' | 'monster' | 'objective' | 'ward';
 export type SimHeroId = 'gareth' | 'luxana';
 export type SimAbilitySlot = 'Q' | 'W' | 'E' | 'R';
 export type SimStatusKind = 'stun' | 'root' | 'slow';
@@ -47,6 +47,12 @@ export interface SimEntity {
   aggroRange: number;
   statuses: SimStatus[];
   towerAggroUntilTick: number;
+  neutral: boolean;
+  campId: string | null;
+  leashRadius: number;
+  visionRadius: number;
+  expiresAtTick: number | null;
+  wardCooldownRemaining: number;
   dead: boolean;
   respawnAtTick: number | null;
   bountyGold: number;
@@ -69,8 +75,10 @@ export interface SimulationState {
   nextEntityId: number;
   entities: Record<string, SimEntity>;
   score: [number, number];
+  objectiveScore: [number, number];
   lastAcceptedSeq: Record<PlayerId, number>;
   laneEnabled: boolean;
+  jungleEnabled: boolean;
   nextWaveTick: number | null;
   waveNumber: number;
   winner: SimTeam | null;
@@ -91,4 +99,5 @@ export interface CreateSimulationOptions {
   height?: number;
   players: SimulationPlayerSeed[];
   withLane?: boolean;
+  withJungle?: boolean;
 }

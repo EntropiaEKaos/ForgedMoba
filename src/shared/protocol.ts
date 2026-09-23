@@ -36,6 +36,12 @@ export interface BuyCommand extends CommandBase {
   itemId: string;
 }
 
+export interface PlaceWardCommand extends CommandBase {
+  type: 'place-ward';
+  x: number;
+  y: number;
+}
+
 export interface UpgradeSkillCommand extends CommandBase {
   type: 'upgrade-skill';
   slot: 'Q' | 'W' | 'E' | 'R';
@@ -51,11 +57,12 @@ export type PlayerCommand =
   | StopCommand
   | CastCommand
   | BuyCommand
+  | PlaceWardCommand
   | UpgradeSkillCommand
   | RecallCommand;
 
 export type CoreMovementCommand = MoveCommand | AttackCommand | StopCommand;
-export type CoreSimulationCommand = CoreMovementCommand | CastCommand | BuyCommand;
+export type CoreSimulationCommand = CoreMovementCommand | CastCommand | BuyCommand | PlaceWardCommand;
 
 export interface MatchFoundPayload {
   matchId: string;

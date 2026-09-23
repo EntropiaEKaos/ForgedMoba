@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { CoreMovementCommand } from '../shared/protocol.ts';
 import { combatFixtureCommands } from './fixtures/combatRepro.ts';
-import { createSimulation, stepSimulation } from './core.ts';
+import { createSimulation, isPositionVisibleToTeam, stepSimulation } from './core.ts';
 import { runDeterminismProbe } from './determinism.ts';
 import { hashSimulationState } from './hash.ts';
 import { buildSpatialHash, querySpatialHash } from './spatialHash.ts';
@@ -276,4 +276,146 @@ test('Q runtime consumes published ability values instead of hidden constants', 
   const expected = gareth.q.damageBase +
     Math.trunc(state.entities['1'].attackDamage * gareth.q.damageAdPermille / 1000);
   assert.equal(hpBefore - target.hp, expected);
+});
+
+
+test('authoritative jungle spawns published neutral camps and objective deterministically', () => {
+  const state = createSimulation({ ...options, withJungle: true });
+  const monsters = Object.values(state.entities).filter((entity) => entity.kind === 'monster');
+  const objectives = Object.values(state.entities).filter((entity) => entity.kind === 'objective');
+  assert.equal(monsters.length, 2);
+  assert.equal(objectives.length, 1);
+  assert.deepEqual(
+    [...monsters, ...objectives].map((entity) => entity.campId).sort(),
+    ['blue-camp', 'red-camp', 'rift-sentinel'],
+  );
+});
+
+test('neutral camp kill grants authoritative reward and respawns from published timing', () => {
+  const state = createSimulation({ ...options, withJungle: true });
+  const hero = state.entities['1'];
+  const camp = Object.values(state.entities).find((entity) => entity.kind === 'monster');
+  assert.ok(camp);
+  const definition = CURRENT_AUTHORITATIVE_CONTENT.payload.neutralUnits.find((entry) => entry.id === camp.campId);
+  assert.ok(definition);
+  camp.x = hero.x + 20;
+  camp.y = hero.y;
+  camp.hp = 1;
+  const goldBefore = hero.gold;
+  const levelBefore = hero.level;
+  const xpBefore = hero.xp;
+  stepSimulation(state, [{ type: 'attack', playerId: 'blue-1', seq: 1, tick: 0, targetId: camp.id }]);
+  assert.equal(camp.dead, true);
+  assert.equal(hero.gold, goldBefore + definition.bountyGold);
+  assert.equal(levelBefore, 1);
+  assert.equal(xpBefore, 0);
+  assert.equal(definition.xpBounty, 110);
+  assert.equal(hero.level, 2);
+  assert.equal(hero.xp, 10);
+  assert.equal(camp.respawnAtTick, definition.respawnTicks);
+  state.tick = camp.respawnAtTick!;
+  stepSimulation(state, []);
+  assert.equal(camp.dead, false);
+  assert.equal(camp.hp, camp.maxHp);
+  assert.equal(camp.respawnAtTick, null);
+  const respawnDx = camp.x - camp.spawnX;
+  const respawnDy = camp.y - camp.spawnY;
+  assert.ok(
+    respawnDx * respawnDx + respawnDy * respawnDy <= camp.moveSpeedPerTick * camp.moveSpeedPerTick,
+    'neutral may move at most one movement step on its respawn tick',
+  );
+});
+
+test('epic objective awards team gold and objective score authoritatively', () => {
+  const state = createSimulation({
+    seed: 91,
+    contentVersion: CURRENT_AUTHORITATIVE_CONTENT.contentVersion,
+    withJungle: true,
+    players: [
+      { playerId: 'blue-1', team: 0 as const, x: 1000, y: 1000, heroId: 'gareth' as const },
+      { playerId: 'blue-2', team: 0 as const, x: 1020, y: 1000, heroId: 'luxana' as const },
+      { playerId: 'red-1', team: 1 as const, x: 2100, y: 1000, heroId: 'luxana' as const },
+    ],
+  });
+  const objective = Object.values(state.entities).find((entity) => entity.kind === 'objective');
+  assert.ok(objective);
+  const definition = CURRENT_AUTHORITATIVE_CONTENT.payload.neutralUnits.find((entry) => entry.id === objective.campId);
+  assert.ok(definition);
+  const killer = state.entities['1'];
+  const ally = state.entities['2'];
+  objective.x = killer.x + 20;
+  objective.y = killer.y;
+  objective.hp = 1;
+  const killerGold = killer.gold;
+  const allyGold = ally.gold;
+  stepSimulation(state, [{ type: 'attack', playerId: 'blue-1', seq: 1, tick: 0, targetId: objective.id }]);
+  assert.equal(state.objectiveScore[0], 1);
+  assert.equal(killer.gold, killerGold + definition.bountyGold + definition.teamGold);
+  assert.equal(ally.gold, allyGold + definition.teamGold);
+});
+
+test('ward placement is authoritative, cooldown-bound, visible and expires deterministically', () => {
+  const state = createSimulation(options);
+  const hero = state.entities['1'];
+  assert.equal(isPositionVisibleToTeam(state, 0, { x: 1900, y: 1000 }), false);
+  stepSimulation(state, [{
+    type: 'place-ward',
+    playerId: 'blue-1',
+    seq: 1,
+    tick: 0,
+    x: 1500,
+    y: 1000,
+  }]);
+  const ward = Object.values(state.entities).find((entity) => entity.kind === 'ward');
+  assert.ok(ward);
+  assert.equal(ward.team, 0);
+  assert.equal(
+    ward.expiresAtTick,
+    CURRENT_AUTHORITATIVE_CONTENT.payload.rules.wardDurationTicks,
+  );
+  assert.equal(
+    hero.wardCooldownRemaining,
+    CURRENT_AUTHORITATIVE_CONTENT.payload.rules.wardCooldownTicks - 1,
+  );
+  assert.equal(isPositionVisibleToTeam(state, 0, { x: 1900, y: 1000 }), true);
+
+  const wardCount = Object.values(state.entities).filter((entity) => entity.kind === 'ward').length;
+  stepSimulation(state, [{
+    type: 'place-ward',
+    playerId: 'blue-1',
+    seq: 2,
+    tick: 1,
+    x: 1400,
+    y: 1000,
+  }]);
+  assert.equal(Object.values(state.entities).filter((entity) => entity.kind === 'ward').length, wardCount);
+
+  ward.expiresAtTick = state.tick;
+  stepSimulation(state, []);
+  assert.equal(state.entities[String(ward.id)], undefined);
+});
+
+test('ward placement beyond published range is rejected', () => {
+  const state = createSimulation(options);
+  stepSimulation(state, [{
+    type: 'place-ward',
+    playerId: 'blue-1',
+    seq: 1,
+    tick: 0,
+    x: 2500,
+    y: 2500,
+  }]);
+  assert.equal(Object.values(state.entities).some((entity) => entity.kind === 'ward'), false);
+});
+
+test('jungle + objective + ward state stays deterministic', () => {
+  const probe = runDeterminismProbe(
+    { ...options, withLane: true, withJungle: true },
+    5_000,
+    (tick) => tick === 0
+      ? [{ type: 'place-ward', playerId: 'blue-1', seq: 1, tick, x: 1300, y: 1000 }]
+      : [],
+  );
+  assert.equal(probe.ok, true, 'jungle/ward divergiu no tick ' + probe.firstDivergentTick);
+  assert.equal(probe.hashA, probe.hashB);
 });

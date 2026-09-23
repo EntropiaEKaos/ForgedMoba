@@ -112,3 +112,35 @@ test('prediction applies published item buys and later reconciles the server ack
   assert.equal(result.pendingCommands, 0);
   assert.deepEqual(prediction.predictThrough(server.tick - 1)?.entities['1'].inventory, ['longsword']);
 });
+
+
+test('prediction replays ward placement and reconciles the authoritative ward entity', () => {
+  const state = baseState();
+  const prediction = new ClientPrediction('blue');
+  prediction.acceptSnapshot(snapshot(state));
+  const command = {
+    type: 'place-ward',
+    playerId: 'blue',
+    seq: 1,
+    tick: 0,
+    x: 1450,
+    y: 1000,
+  } as const;
+  prediction.record(command);
+
+  const predicted = prediction.predictThrough(0);
+  assert.equal(
+    Object.values(predicted?.entities ?? {}).filter((entity) => entity.kind === 'ward').length,
+    1,
+  );
+
+  const server = baseState();
+  stepSimulation(server, [command]);
+  const result = prediction.acceptSnapshot(snapshot(server, 1), server.tick - 1);
+  assert.equal(result.pendingCommands, 0);
+  const reconciled = prediction.predictThrough(server.tick - 1);
+  assert.equal(
+    Object.values(reconciled?.entities ?? {}).filter((entity) => entity.kind === 'ward').length,
+    1,
+  );
+});

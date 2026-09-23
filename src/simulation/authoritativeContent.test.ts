@@ -49,3 +49,19 @@ test('published pack is frozen and detached from the source draft', () => {
   assert.equal(Object.isFrozen(published.payload), true);
   assert.equal(Object.isFrozen(published.payload.heroes[0]), true);
 });
+
+
+test('jungle and ward gameplay mutations alter the published content hash', () => {
+  const original = structuredClone(CURRENT_AUTHORITATIVE_CONTENT.payload);
+  const jungleChanged = structuredClone(original);
+  jungleChanged.neutralUnits[0].respawnTicks += 1;
+  const wardChanged = structuredClone(original);
+  wardChanged.rules.wardDurationTicks += 1;
+
+  const base = publishAuthoritativeContent('authority-test', original);
+  const jungle = publishAuthoritativeContent('authority-test', jungleChanged);
+  const ward = publishAuthoritativeContent('authority-test', wardChanged);
+
+  assert.notEqual(base.contentVersion, jungle.contentVersion);
+  assert.notEqual(base.contentVersion, ward.contentVersion);
+});

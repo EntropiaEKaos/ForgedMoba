@@ -140,3 +140,34 @@ test('runner accepts authoritative buy commands and applies published item stats
   assert.equal(hero.gold, CURRENT_AUTHORITATIVE_CONTENT.payload.rules.startingGold - 350);
   assert.equal(hero.attackDamage, beforeDamage + 10);
 });
+
+
+test('runner enables published jungle and accepts authoritative ward commands', () => {
+  const runner = createRunner();
+  assert.equal(runner.state.jungleEnabled, true);
+  assert.equal(
+    Object.values(runner.state.entities).filter((entity) => entity.kind === 'monster').length,
+    2,
+  );
+  assert.equal(
+    Object.values(runner.state.entities).filter((entity) => entity.kind === 'objective').length,
+    1,
+  );
+
+  const hero = runner.state.entities['1'];
+  assert.deepEqual(
+    runner.enqueue('blue-1', {
+      type: 'place-ward',
+      playerId: 'spoof',
+      seq: 1,
+      tick: 0,
+      x: hero.x + 200,
+      y: hero.y,
+    }),
+    { ok: true },
+  );
+  runner.advanceOneTick();
+  const ward = Object.values(runner.state.entities).find((entity) => entity.kind === 'ward');
+  assert.ok(ward);
+  assert.equal(ward.ownerPlayerId, 'blue-1');
+});

@@ -58,7 +58,11 @@ export function OnlineMatchScreen() {
 
       let best: { id: number; d2: number } | null = null;
       for (const entity of Object.values(state.entities)) {
-        if (entity.dead || entity.team === local.team) continue;
+        if (
+          entity.dead ||
+          entity.kind === 'ward' ||
+          (!entity.neutral && entity.team === local.team)
+        ) continue;
         const dx = entity.x - worldX;
         const dy = entity.y - worldY;
         const d2 = dx * dx + dy * dy;
@@ -95,6 +99,9 @@ export function OnlineMatchScreen() {
       }
       if (conn.matchResult) return;
       if (event.key === 's' || event.key === 'S') conn.sendStop();
+      if (event.key === '4' || event.key === 'v' || event.key === 'V') {
+        conn.sendPlaceWard(pointerWorld.x, pointerWorld.y);
+      }
       if (event.key === 'q' || event.key === 'Q') {
         const state = conn.predictedState ?? conn.authoritativeSnapshot?.state;
         const local = localEntity(state ?? null, user?.id);
@@ -156,6 +163,9 @@ export function OnlineMatchScreen() {
         ctx.arc(x, y, radius, 0, Math.PI * 2);
         if (authoritative.kind === 'tower') ctx.fillStyle = authoritative.team === 0 ? '#4aa8ff' : '#ff5f5f';
         else if (authoritative.kind === 'minion') ctx.fillStyle = authoritative.team === 0 ? '#5c86b0' : '#ad6969';
+        else if (authoritative.kind === 'monster') ctx.fillStyle = '#8b6f47';
+        else if (authoritative.kind === 'objective') ctx.fillStyle = '#b06cff';
+        else if (authoritative.kind === 'ward') ctx.fillStyle = authoritative.team === 0 ? '#6ad5ff' : '#ff8aa8';
         else if (isLocal) ctx.fillStyle = '#e8c860';
         else ctx.fillStyle = authoritative.team === 0 ? '#65c0ff' : '#ff8080';
         ctx.fill();
@@ -166,13 +176,20 @@ export function OnlineMatchScreen() {
           ctx.stroke();
         }
 
-        drawHealth(x, y + radius + 5, hp, maxHp, Math.max(22, radius * 2.3));
+        if (authoritative.kind !== 'ward') {
+          drawHealth(x, y + radius + 5, hp, maxHp, Math.max(22, radius * 2.3));
+        }
 
         if (authoritative.kind === 'hero') {
           ctx.fillStyle = '#d8e4e8';
           ctx.font = '11px monospace';
           ctx.textAlign = 'center';
           ctx.fillText(authoritative.heroId ?? 'hero', x, y - radius - 8);
+        } else if (authoritative.kind === 'monster' || authoritative.kind === 'objective') {
+          ctx.fillStyle = '#d8e4e8';
+          ctx.font = '10px monospace';
+          ctx.textAlign = 'center';
+          ctx.fillText(authoritative.campId ?? authoritative.kind, x, y - radius - 8);
         }
       }
 
@@ -230,6 +247,11 @@ export function OnlineMatchScreen() {
           {' · '}match {match.matchId.slice(0, 8)}
         </div>
         <div>team {match.team} · slot {match.slot}</div>
+        <div>
+          objectives {authoritativeSnapshot?.state.objectiveScore?.[0] ?? 0}
+          {' : '}
+          {authoritativeSnapshot?.state.objectiveScore?.[1] ?? 0}
+        </div>
         <div>tick {authoritativeSnapshot?.serverTick ?? '—'} · {match.serverTickRate} Hz · snapshots ~10 Hz</div>
         <div>RTT {networkMetrics.rttMs === null ? '—' : networkMetrics.rttMs.toFixed(1)} ms · jitter {networkMetrics.jitterMs.toFixed(1)} ms</div>
         <div>correction {networkMetrics.correctionDistance.toFixed(2)} · pending {pendingInputs}</div>
@@ -245,7 +267,7 @@ export function OnlineMatchScreen() {
       </div>
 
       <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 bg-[#09131a]/90 border border-[#28434d] px-4 py-2 text-xs">
-        RMB mover · LMB atacar · Q habilidade autoritativa · S parar · ESC sair
+        RMB mover · LMB atacar · Q habilidade · 4/V ward · S parar · ESC sair
       </div>
 
       <div className="absolute bottom-3 right-3 z-10 w-64 bg-[#09131a]/95 border-2 border-[#5b4a23] p-3 text-xs">
@@ -253,6 +275,10 @@ export function OnlineMatchScreen() {
         <div className="mb-2 text-[#b5c7cc]">
           Ouro: <b className="text-[#ffe080]">{localSnapshotEntity?.gold ?? '—'}</b>
           {' · '}slots {localSnapshotEntity?.inventory.length ?? 0}/{CURRENT_AUTHORITATIVE_CONTENT.payload.rules.maxInventorySlots}
+          <br />
+          Ward: {localSnapshotEntity?.wardCooldownRemaining
+            ? Math.ceil(localSnapshotEntity.wardCooldownRemaining / 30) + 's'
+            : 'pronta'}
         </div>
         <div className="grid grid-cols-2 gap-1.5">
           {publishedItems.map((item) => (
