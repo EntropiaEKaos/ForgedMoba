@@ -9,16 +9,20 @@ import { createServer } from 'http';
 import { Server as SocketServer, type Socket } from 'socket.io';
 import cors from 'cors';
 import jwt from 'jsonwebtoken';
+import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 
 const PORT = process.env.PORT || 3001;
 const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:5173';
 const JWT_SECRET = process.env.JWT_SECRET || 'pixel-rift-dev-secret';
+if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
+  throw new Error('JWT_SECRET is required in production');
+}
 
 interface DbUser {
   id: string;
   username: string;
   email: string;
-  password: string;
+  passwordHash: string;
   level: number;
 }
 
@@ -52,6 +56,20 @@ const io = new SocketServer(httpServer, {
 
 app.use(cors({ origin: CORS_ORIGIN, credentials: true }));
 app.use(express.json({ limit: '32kb' }));
+
+function hashPassword(password: string): string {
+  const salt = randomBytes(16);
+  const hash = scryptSync(password, salt, 64);
+  return `${salt.toString('hex')}:${hash.toString('hex')}`;
+}
+
+function passwordMatches(password: string, encoded: string): boolean {
+  const [saltHex, hashHex] = encoded.split(':');
+  if (!saltHex || !hashHex) return false;
+  const expected = Buffer.from(hashHex, 'hex');
+  const actual = scryptSync(password, Buffer.from(saltHex, 'hex'), expected.length);
+  return expected.length === actual.length && timingSafeEqual(expected, actual);
+}
 
 function sign(user: DbUser) {
   return jwt.sign(
@@ -108,7 +126,7 @@ app.post('/api/auth/register', (req, res) => {
   if (usersByName.has(username)) return res.status(409).json({ error: 'Usuário já existe' });
 
   const id = crypto.randomUUID();
-  const user: DbUser = { id, username, email, password, level: 1 };
+  const user: DbUser = { id, username, email, passwordHash: hashPassword(password), level: 1 };
   users.set(id, user);
   usersByName.set(username, id);
   return res.json({ user: { id, username, email, level: 1 }, token: sign(user) });
@@ -123,7 +141,7 @@ app.post('/api/auth/login', (req, res) => {
   const id = usersByName.get(username);
   if (!id) return res.status(401).json({ error: 'Usuário não encontrado' });
   const user = users.get(id);
-  if (!user || user.password !== password) return res.status(401).json({ error: 'Senha incorreta' });
+  if (!user || !passwordMatches(password, user.passwordHash)) return res.status(401).json({ error: 'Senha incorreta' });
 
   return res.json({
     user: { id: user.id, username: user.username, email: user.email, level: user.level },
