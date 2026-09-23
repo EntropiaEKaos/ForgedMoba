@@ -302,11 +302,16 @@ test('neutral camp kill grants authoritative reward and respawns from published 
   camp.y = hero.y;
   camp.hp = 1;
   const goldBefore = hero.gold;
+  const levelBefore = hero.level;
   const xpBefore = hero.xp;
   stepSimulation(state, [{ type: 'attack', playerId: 'blue-1', seq: 1, tick: 0, targetId: camp.id }]);
   assert.equal(camp.dead, true);
   assert.equal(hero.gold, goldBefore + definition.bountyGold);
-  assert.equal(hero.xp, xpBefore + definition.xpBounty);
+  assert.equal(levelBefore, 1);
+  assert.equal(xpBefore, 0);
+  assert.equal(definition.xpBounty, 110);
+  assert.equal(hero.level, 2);
+  assert.equal(hero.xp, 10);
   assert.equal(camp.respawnAtTick, definition.respawnTicks);
   state.tick = camp.respawnAtTick!;
   stepSimulation(state, []);
