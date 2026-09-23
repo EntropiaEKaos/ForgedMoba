@@ -15,10 +15,12 @@ import { createContentManifest } from '../../src/shared/contentVersion.ts';
 import { SIM_TICK_RATE } from '../../src/simulation/index.ts';
 import { MatchRunner, stableSeedFromMatchId } from './matchRunner.ts';
 import { MatchmakingQueues, type MatchmakingEntry } from './matchmaking.ts';
+import { ReconnectGraceRegistry } from './reconnectGrace.ts';
 
 const PORT = Number(process.env.PORT || 3001);
 const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:5173';
-const SERVER_VERSION = '2.4.0';
+const SERVER_VERSION = '2.5.0';
+const RECONNECT_GRACE_MS = 30_000;
 const CONTENT_MANIFEST = createContentManifest('core-0.3', {
   simulationVersion: 3,
   tickRate: SIM_TICK_RATE,
@@ -60,6 +62,7 @@ const usersByName = new Map<string, string>();
 const usersByEmail = new Map<string, string>();
 const matchmaking = new MatchmakingQueues();
 const activeMatches = new Map<string, ActiveMatch>();
+const reconnectGrace = new ReconnectGraceRegistry(RECONNECT_GRACE_MS);
 
 const app = express();
 const httpServer = createServer(app);
@@ -115,7 +118,7 @@ function removeSocketFromQueue(socketId: string): void {
 }
 
 function parseMatchMode(value: unknown): MatchMode | null {
-  return value === 'duel1v1' || value === 'ranked5v5' ? value : null;
+  return value === 'duel1v1' || value === 'skirmish3v3' || value === 'ranked5v5' ? value : null;
 }
 function socketIdentity(socket: Socket): AuthedSocketData { return socket.data as AuthedSocketData; }
 
@@ -145,6 +148,7 @@ function foundPayload(match: ActiveMatch, player: MatchPlayer) {
     playerId: player.userId,
     contentVersion: CONTENT_VERSION,
     serverTickRate: SIM_TICK_RATE,
+    reconnectGraceMs: RECONNECT_GRACE_MS,
   };
 }
 
@@ -175,6 +179,7 @@ function createMatch(players: QueueEntry[], mode: MatchMode): ActiveMatch {
           }
         }
       }
+      reconnectGrace.clearMatch(id);
       activeMatches.delete(id);
     },
   });
@@ -203,9 +208,26 @@ app.get('/api/health', (_req, res) => {
     players: io.engine.clientsCount,
     queueSize: matchmaking.size('ranked5v5'),
     duelQueueSize: matchmaking.size('duel1v1'),
+    skirmishQueueSize: matchmaking.size('skirmish3v3'),
+    reconnectGraceMs: RECONNECT_GRACE_MS,
     activeMatches: activeMatches.size,
   });
 });
+
+const reconnectSweep = setInterval(() => {
+  for (const lease of reconnectGrace.consumeExpired()) {
+    const match = activeMatches.get(lease.matchId);
+    if (!match) continue;
+    const participant = match.players.find((entry) => entry.userId === lease.playerId);
+    if (!participant) continue;
+    console.log(
+      '[reconnect] grace expirou match=' + lease.matchId +
+      ' player=' + lease.playerId + ' team=' + lease.team,
+    );
+    match.runner.forfeitTeam(lease.team);
+  }
+}, 1_000);
+reconnectSweep.unref();
 
 app.post('/api/auth/register', authRateLimit, (req, res) => {
   const { username, email, password } = req.body as Record<string, unknown>;
@@ -278,8 +300,13 @@ io.on('connection', (socket) => {
     resumable.player.socketId = socket.id;
     identity.matchId = resumable.match.id;
     socket.join(resumable.match.id);
+    reconnectGrace.markReconnected(resumable.match.id, identity.userId);
     socket.emit('game:resumed', foundPayload(resumable.match, resumable.player));
     socket.emit('game:snapshot', resumable.match.runner.snapshot());
+    socket.to(resumable.match.id).emit('game:player-reconnected', {
+      matchId: resumable.match.id,
+      playerId: identity.userId,
+    });
   }
 
   socket.on('net:ping', (_clientSentAt: unknown, ack?: () => void) => {
@@ -304,7 +331,10 @@ io.on('connection', (socket) => {
       mode: joined.mode,
       position: joined.position,
       requiredPlayers: joined.requiredPlayers,
-      estimatedTime: Math.max(5, joined.position * (joined.mode === 'duel1v1' ? 10 : 30)),
+      estimatedTime: Math.max(
+        5,
+        joined.position * (joined.mode === 'duel1v1' ? 10 : joined.mode === 'skirmish3v3' ? 15 : 30),
+      ),
     });
 
     const ready = matchmaking.takeReady(joined.mode);
@@ -349,8 +379,15 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     removeSocketFromQueue(socket.id);
     const matchId = identity.matchId;
-    if (matchId && activeMatches.has(matchId)) {
-      socket.to(matchId).emit('game:player-left', { matchId, playerId: identity.userId });
+    const match = matchId ? activeMatches.get(matchId) : undefined;
+    const participant = match?.players.find((entry) => entry.userId === identity.userId);
+    if (matchId && match && participant && participant.socketId === socket.id) {
+      const lease = reconnectGrace.markDisconnected(matchId, identity.userId, participant.team);
+      socket.to(matchId).emit('game:player-disconnected', {
+        matchId,
+        playerId: identity.userId,
+        reconnectDeadline: lease.expiresAt,
+      });
     }
     console.log('[socket] desconectado: ' + identity.username + ' (' + socket.id + ')');
   });
