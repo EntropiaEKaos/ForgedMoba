@@ -1,6 +1,6 @@
 # 🎮 Pixel Rift — Documentação Técnica
 
-MOBA Cartoon 5v5 super expressivo com **47 heróis jogáveis**, 40+ itens com receitas, sistema de feitiços e runas pré-partida, wards e Fog of War dinâmica, e mecânicas lendárias de Dota (Buyback, Deny de minions e Runas do Rio). O projeto conta com persistência de dados local (carreira, maestria, histórico de 50 partidas, skins), console administrativo embutido (Ctrl+Shift+M) e suporte online (JWT + Socket.io) com fallback offline inteligente.
+MOBA Cartoon 5v5 super expressivo com **23 heróis jogáveis**, 39 itens com receitas, sistema de feitiços e runas pré-partida, wards e Fog of War dinâmica, e mecânicas lendárias de Dota (Buyback, Deny de minions e Runas do Rio). O projeto conta com persistência de dados local (carreira, maestria, histórico de 50 partidas, skins), console administrativo embutido (Ctrl+Shift+M) e suporte online (JWT + Socket.io) com fallback offline inteligente.
 
 ## Arquitetura Atual
 
@@ -86,7 +86,7 @@ Consulte `ADMIN.md`, `GAMEPLAY.md` e `EXTENDING.md`.
 - ✅ **Visão muito escura**: raio de visão aumentado (200→320 melee, 260→380 ranged, 320→450 torres), fog reduzido (0.82→0.68), gradientes suavizados
 - ✅ **Junglers invadindo lanes**: novo `junglerAI` com rota fixa de acampamentos do próprio lado, smite automático, ganks oportunistas
 - ✅ **Bots travados na base**: saída direta para o primeiro waypoint da rota (garantido caminhável), sem espera de 94% de vida
-- ✅ **+10 heróis**: Jaina, Thresk, Jinxara, Yasuke, Zedric, Sonara, Garen, Malzahar, Nidalee, Akali, Braum (22 total)
+- ✅ **+11 heróis**: Jaina, Thresk, Jinxara, Yasuke, Zedric, Sonara, Garen, Malzahar, Nidalee, Akali, Braum (23 total)
 - ✅ **Last-hit bonus**: +50% de ouro em minions mortos por herói
 - ✅ **Bounty system**: ouro por abate escala com sequência de kills (300→1000), shutdown gold
 - ✅ **Feitiços de invocador**: 8 tipos (Flash obrigatório), seleção pré-partida
@@ -152,7 +152,7 @@ requestAnimationFrame → update(dt) → render()
 
 ## 2. Heróis e Habilidades
 
-**22 heróis no total** (12 iniciais + 10 extras):
+**23 heróis no total** (12 iniciais + 10 extras):
 
 ### Heróis Iniciais (12)
 | ID | Nome | Título | Role |
@@ -170,7 +170,7 @@ requestAnimationFrame → update(dt) → render()
 | warrik | Warrik | O Lobo de Zaun | Lutador |
 | morgause | Morgause | A Anja Caída | Suporte |
 
-### Heróis Extras (10)
+### Heróis Extras (11)
 | ID | Nome | Título | Role |
 |----|------|--------|------|
 | jaina | Jaina | A Feiticeira do Gelo | Maga |
