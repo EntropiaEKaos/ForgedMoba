@@ -20,10 +20,13 @@ import { MatchRunner, stableSeedFromMatchId } from './matchRunner.ts';
 import { MatchmakingQueues, type MatchmakingEntry } from './matchmaking.ts';
 import { ReconnectGraceRegistry } from './reconnectGrace.ts';
 import { RankedDraftRoom } from './rankedDraft.ts';
+import { EventRateLimiter, type EventRatePolicy } from './eventRateLimiter.ts';
+import { MetricsRegistry } from './metrics.ts';
+import { createMatchArchiveStore } from './matchArchive.ts';
 
 const PORT = Number(process.env.PORT || 3001);
 const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:5173';
-const SERVER_VERSION = '2.7.0';
+const SERVER_VERSION = '3.0.0-rc.1';
 const RECONNECT_GRACE_MS = 30_000;
 const RANKED_DRAFT_TIMEOUT_MS = 120_000;
 const CONTENT_VERSION = CURRENT_AUTHORITATIVE_CONTENT.contentVersion;
@@ -75,6 +78,17 @@ const matchmaking = new MatchmakingQueues();
 const activeMatches = new Map<string, ActiveMatch>();
 const draftRooms = new Map<string, RankedDraftRoom>();
 const reconnectGrace = new ReconnectGraceRegistry(RECONNECT_GRACE_MS);
+const eventRateLimiter = new EventRateLimiter();
+const metrics = new MetricsRegistry();
+const matchArchive = createMatchArchiveStore(process.env.MATCH_ARCHIVE_DIR);
+const METRICS_TOKEN = process.env.METRICS_TOKEN?.trim() || null;
+
+const SOCKET_EVENT_POLICIES = {
+  queue: { capacity: 12, refillPerSecond: 2 },
+  draft: { capacity: 60, refillPerSecond: 20 },
+  gameInput: { capacity: 180, refillPerSecond: 90 },
+  gameLeave: { capacity: 4, refillPerSecond: 0.1 },
+} satisfies Record<string, EventRatePolicy>;
 
 const app = express();
 const httpServer = createServer(app);
@@ -98,6 +112,7 @@ function authRateLimit(req: Request, res: Response, next: NextFunction): void {
   }
   current.count += 1;
   if (current.count > 20) {
+    metrics.inc('forged_http_rate_limited_total', { route: 'auth' });
     res.status(429).json({ error: 'Muitas tentativas. Aguarde um minuto.' });
     return;
   }
@@ -127,6 +142,19 @@ function sign(user: DbUser): string {
 }
 function removeSocketFromQueue(socketId: string): void {
   matchmaking.leaveBySocket(socketId);
+}
+
+function allowSocketEvent(
+  socket: Socket,
+  event: string,
+  policy: EventRatePolicy,
+  notify = true,
+): boolean {
+  const allowed = eventRateLimiter.allow(socket.id + ':' + event, policy);
+  if (allowed) return true;
+  metrics.inc('forged_socket_rate_limited_total', { event });
+  if (notify) socket.emit('game:error', { code: 'rate-limited', event });
+  return false;
 }
 
 function parseMatchMode(value: unknown): MatchMode | null {
@@ -195,6 +223,7 @@ function cancelDraft(draftId: string, code: string): void {
     participantSocket.leave(draftRoomName(draftId));
   }
   draftRooms.delete(draftId);
+  metrics.inc('forged_drafts_cancelled_total', { code });
 }
 
 function createRankedDraft(players: QueueEntry[]): RankedDraftRoom {
@@ -207,6 +236,7 @@ function createRankedDraft(players: QueueEntry[]): RankedDraftRoom {
     timeoutMs: RANKED_DRAFT_TIMEOUT_MS,
   });
   draftRooms.set(draftId, draft);
+  metrics.inc('forged_drafts_created_total');
 
   for (const participant of draft.snapshot().players) {
     const socketId = draft.socketIdFor(participant.playerId);
@@ -237,9 +267,19 @@ function createAssignedMatch(assigned: MatchPlayer[], mode: MatchMode): ActiveMa
       slot: player.slot,
       heroId: player.heroId,
     })),
-    onSnapshot: (snapshot) => io.to(id).emit('game:snapshot', snapshot),
-    onComplete: (state) => {
+    onSnapshot: (snapshot) => {
+      metrics.inc('forged_snapshots_total', { mode });
+      io.to(id).emit('game:snapshot', snapshot);
+    },
+    onComplete: (state, replay) => {
       console.log('[match] concluída ' + id + ' vencedor=' + state.winner);
+      metrics.inc('forged_matches_completed_total', { mode, winner: state.winner ?? 'none' });
+      void matchArchive.save(replay)
+        .then(() => metrics.inc('forged_replays_archived_total'))
+        .catch((error) => {
+          metrics.inc('forged_replay_archive_failures_total');
+          console.error('[archive] falha ao persistir replay ' + id, error);
+        });
       io.to(id).emit('game:complete', { matchId: id, winner: state.winner });
       const completed = activeMatches.get(id);
       if (completed) {
@@ -257,6 +297,7 @@ function createAssignedMatch(assigned: MatchPlayer[], mode: MatchMode): ActiveMa
   });
   const match: ActiveMatch = { id, mode, players: assigned, createdAt: Date.now(), runner };
   activeMatches.set(id, match);
+  metrics.inc('forged_matches_started_total', { mode });
 
   for (const player of assigned) {
     const playerSocket = io.sockets.sockets.get(player.socketId);
@@ -266,6 +307,7 @@ function createAssignedMatch(assigned: MatchPlayer[], mode: MatchMode): ActiveMa
     playerSocket.emit('queue:found', foundPayload(match, player));
   }
   io.to(id).emit('game:snapshot', runner.snapshot());
+  metrics.inc('forged_snapshots_total', { mode });
   runner.start();
   return match;
 }
@@ -312,6 +354,7 @@ function launchDraft(draft: RankedDraftRoom): ActiveMatch | null {
 
   draftRooms.delete(draftId);
   const match = createAssignedMatch(assigned, 'ranked5v5');
+  metrics.inc('forged_drafts_launched_total');
   console.log('[draft] lançada ' + draftId + ' -> match=' + match.id);
   return match;
 }
@@ -321,11 +364,26 @@ app.get('/api/content/current', (_req, res) => {
   res.json(CURRENT_AUTHORITATIVE_CONTENT);
 });
 
+app.get('/metrics', (req, res) => {
+  if (METRICS_TOKEN && req.get('authorization') !== 'Bearer ' + METRICS_TOKEN) {
+    return res.status(401).end();
+  }
+  res.type('text/plain; version=0.0.4; charset=utf-8');
+  return res.send(metrics.render([
+    { name: 'forged_active_connections', labels: {}, value: io.engine.clientsCount },
+    { name: 'forged_active_matches', labels: {}, value: activeMatches.size },
+    { name: 'forged_active_drafts', labels: {}, value: draftRooms.size },
+    { name: 'forged_queue_players', labels: { mode: 'duel1v1' }, value: matchmaking.size('duel1v1') },
+    { name: 'forged_queue_players', labels: { mode: 'skirmish3v3' }, value: matchmaking.size('skirmish3v3') },
+    { name: 'forged_queue_players', labels: { mode: 'ranked5v5' }, value: matchmaking.size('ranked5v5') },
+  ]));
+});
+
 app.get('/api/health', (_req, res) => {
   res.json({
     status: 'ok',
     version: SERVER_VERSION,
-    mode: 'ephemeral-authoritative-slice',
+    mode: 'authoritative-5v5-rc',
     contentVersion: CONTENT_VERSION,
     tickRate: SIM_TICK_RATE,
     players: io.engine.clientsCount,
@@ -336,6 +394,7 @@ app.get('/api/health', (_req, res) => {
     rankedDraftTimeoutMs: RANKED_DRAFT_TIMEOUT_MS,
     activeDrafts: draftRooms.size,
     activeMatches: activeMatches.size,
+    replayArchive: process.env.MATCH_ARCHIVE_DIR?.trim() ? 'file' : 'memory',
   });
 });
 
@@ -349,6 +408,7 @@ const reconnectSweep = setInterval(() => {
       '[reconnect] grace expirou match=' + lease.matchId +
       ' player=' + lease.playerId + ' team=' + lease.team,
     );
+    metrics.inc('forged_reconnect_expired_total', { mode: match.mode });
     match.runner.forfeitTeam(lease.team);
   }
 }, 1_000);
