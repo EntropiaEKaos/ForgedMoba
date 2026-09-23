@@ -317,7 +317,13 @@ test('neutral camp kill grants authoritative reward and respawns from published 
   stepSimulation(state, []);
   assert.equal(camp.dead, false);
   assert.equal(camp.hp, camp.maxHp);
-  assert.deepEqual([camp.x, camp.y], [camp.spawnX, camp.spawnY]);
+  assert.equal(camp.respawnAtTick, null);
+  const respawnDx = camp.x - camp.spawnX;
+  const respawnDy = camp.y - camp.spawnY;
+  assert.ok(
+    respawnDx * respawnDx + respawnDy * respawnDy <= camp.moveSpeedPerTick * camp.moveSpeedPerTick,
+    'neutral may move at most one movement step on its respawn tick',
+  );
 });
 
 test('epic objective awards team gold and objective score authoritatively', () => {
