@@ -4,6 +4,7 @@ import {
   authoritativeHero,
   authoritativeItem,
   type AuthoritativeContentPayload,
+  type AuthoritativeNeutralContent,
 } from '../shared/authoritativeContent.ts';
 import { normalizeSeed, rollPermille } from './rng.ts';
 import { buildSpatialHash, querySpatialHash, type SpatialHash } from './spatialHash.ts';
@@ -82,6 +83,12 @@ function baseEntityFields() {
     abilityCooldowns: EMPTY_COOLDOWNS(),
     statuses: [] as SimStatus[],
     towerAggroUntilTick: 0,
+    neutral: false,
+    campId: null as string | null,
+    leashRadius: 0,
+    visionRadius: 0,
+    expiresAtTick: null as number | null,
+    wardCooldownRemaining: 0,
     inventory: [] as string[],
   };
 }
@@ -116,6 +123,7 @@ function createHero(
     attackCooldownTicks: publishedHero.attackCooldownTicks,
     attackCooldownRemaining: 0,
     ...baseEntityFields(),
+    visionRadius: content.rules.heroVisionRadius,
     moveSpeedPerTick: publishedHero.moveSpeedPerTick,
     critChancePermille: publishedHero.critChancePermille,
     aggroRange: 0,
@@ -218,6 +226,62 @@ function spawnMinion(state: SimulationState, team: SimTeam, offset: number): voi
   };
 }
 
+function spawnNeutralUnit(
+  state: SimulationState,
+  definition: AuthoritativeNeutralContent,
+): void {
+  const id = state.nextEntityId++;
+  const x = Math.trunc(state.width * definition.xPermille / 1000);
+  const y = Math.trunc(state.height * definition.yPermille / 1000);
+  state.entities[String(id)] = {
+    id,
+    kind: definition.kind === 'objective' ? 'objective' : 'monster',
+    team: 0,
+    ownerPlayerId: null,
+    heroId: null,
+    x,
+    y,
+    spawnX: x,
+    spawnY: y,
+    radius: definition.kind === 'objective' ? 32 : 20,
+    moveTarget: null,
+    attackTargetId: null,
+    hp: definition.maxHp,
+    maxHp: definition.maxHp,
+    attackDamage: definition.attackDamage,
+    attackRange: definition.attackRange,
+    attackCooldownTicks: definition.attackCooldownTicks,
+    attackCooldownRemaining: 0,
+    ...baseEntityFields(),
+    neutral: true,
+    campId: definition.id,
+    leashRadius: definition.leashRadius,
+    moveSpeedPerTick: definition.moveSpeedPerTick,
+    critChancePermille: 0,
+    aggroRange: definition.aggroRange,
+    dead: false,
+    respawnAtTick: null,
+    bountyGold: definition.bountyGold,
+    xpBounty: definition.xpBounty,
+    level: 1,
+    xp: 0,
+    gold: 0,
+    cs: 0,
+  };
+}
+
+function spawnJungle(state: SimulationState, content: AuthoritativeContentPayload): void {
+  for (const definition of content.neutralUnits) spawnNeutralUnit(state, definition);
+}
+
+function neutralDefinition(
+  entity: SimEntity,
+  content: AuthoritativeContentPayload,
+): AuthoritativeNeutralContent | null {
+  if (!entity.campId) return null;
+  return content.neutralUnits.find((entry) => entry.id === entity.campId) ?? null;
+}
+
 function spawnWave(state: SimulationState): void {
   const offsets = [-26, 0, 26];
   for (const team of [0, 1] as const) {
@@ -306,7 +370,12 @@ function shareMinionXp(state: SimulationState, victim: SimEntity, killerTeam: Si
   for (const hero of nearby) grantXp(hero, share);
 }
 
-function awardKill(state: SimulationState, attacker: SimEntity, victim: SimEntity): void {
+function awardKill(
+  state: SimulationState,
+  attacker: SimEntity,
+  victim: SimEntity,
+  content: AuthoritativeContentPayload,
+): void {
   if (attacker.kind === 'hero') {
     attacker.gold += victim.bountyGold;
     if (victim.kind === 'minion') attacker.cs += 1;
@@ -314,6 +383,16 @@ function awardKill(state: SimulationState, attacker: SimEntity, victim: SimEntit
   }
   if (victim.kind === 'minion') shareMinionXp(state, victim, attacker.team);
   if (victim.kind === 'hero') state.score[attacker.team] += 1;
+  if (victim.kind === 'objective') {
+    state.objectiveScore[attacker.team] += 1;
+    const definition = neutralDefinition(victim, content);
+    const teamGold = definition?.teamGold ?? 0;
+    if (teamGold > 0) {
+      for (const entity of Object.values(state.entities)) {
+        if (entity.kind === 'hero' && entity.team === attacker.team) entity.gold += teamGold;
+      }
+    }
+  }
 }
 
 function killEntity(
@@ -327,13 +406,23 @@ function killEntity(
   victim.moveTarget = null;
   victim.attackTargetId = null;
   victim.statuses = [];
-  victim.respawnAtTick = victim.kind === 'hero' ? state.tick + content.rules.heroRespawnTicks : null;
-  awardKill(state, attacker, victim);
+  if (victim.kind === 'hero') {
+    victim.respawnAtTick = state.tick + content.rules.heroRespawnTicks;
+  } else if (victim.kind === 'monster' || victim.kind === 'objective') {
+    const definition = neutralDefinition(victim, content);
+    victim.respawnAtTick = definition ? state.tick + definition.respawnTicks : null;
+  } else {
+    victim.respawnAtTick = null;
+  }
+  awardKill(state, attacker, victim, content);
   if (victim.kind === 'tower') state.winner = attacker.team;
 }
 
 function validEnemy(attacker: SimEntity, target: SimEntity | undefined): target is SimEntity {
-  return Boolean(target && !target.dead && target.team !== attacker.team);
+  if (!target || target.dead || target.kind === 'ward') return false;
+  if (attacker.neutral) return !target.neutral && target.kind === 'hero';
+  if (target.neutral) return target.kind === 'monster' || target.kind === 'objective';
+  return target.team !== attacker.team;
 }
 
 function markTowerAggro(state: SimulationState, attacker: SimEntity, victim: SimEntity): void {
@@ -351,6 +440,7 @@ function dealDamage(
 ): void {
   if (!validEnemy(attacker, victim) || amount <= 0) return;
   markTowerAggro(state, attacker, victim);
+  if (victim.neutral && attacker.kind === 'hero') victim.attackTargetId = attacker.id;
   victim.hp = Math.max(0, victim.hp - Math.max(0, Math.trunc(amount)));
   if (victim.hp === 0) killEntity(state, victim, attacker, content);
 }
@@ -378,7 +468,12 @@ function tryAttack(state: SimulationState, attacker: SimEntity, content: Authori
 }
 
 function respawnIfReady(state: SimulationState, entity: SimEntity): void {
-  if (entity.kind !== 'hero' || !entity.dead || entity.respawnAtTick === null || state.tick < entity.respawnAtTick) return;
+  if (
+    (entity.kind !== 'hero' && entity.kind !== 'monster' && entity.kind !== 'objective') ||
+    !entity.dead ||
+    entity.respawnAtTick === null ||
+    state.tick < entity.respawnAtTick
+  ) return;
   entity.dead = false;
   entity.hp = entity.maxHp;
   entity.x = entity.spawnX;
@@ -463,8 +558,54 @@ function updateTowerAI(state: SimulationState, index: SpatialHash, tower: SimEnt
   tower.attackTargetId = (minion ?? hero)?.id ?? null;
 }
 
+function updateNeutralAI(state: SimulationState, index: SpatialHash, neutral: SimEntity): void {
+  if (neutral.dead || !neutral.neutral) return;
+  const spawn = { x: neutral.spawnX, y: neutral.spawnY };
+  const leashSq = neutral.leashRadius * neutral.leashRadius;
+
+  if (squaredDistance(neutral, spawn) > leashSq) {
+    neutral.attackTargetId = null;
+    neutral.moveTarget = spawn;
+    return;
+  }
+
+  const current = neutral.attackTargetId === null
+    ? undefined
+    : state.entities[String(neutral.attackTargetId)];
+  const currentValid = validEnemy(neutral, current) &&
+    squaredDistance(current, spawn) <= leashSq;
+
+  if (!currentValid) {
+    const target = nearestEnemy(
+      state,
+      index,
+      neutral,
+      neutral.aggroRange,
+      ['hero'],
+      (candidate) => squaredDistance(candidate, spawn) <= leashSq,
+    );
+    neutral.attackTargetId = target?.id ?? null;
+  }
+
+  const target = neutral.attackTargetId === null
+    ? undefined
+    : state.entities[String(neutral.attackTargetId)];
+  if (validEnemy(neutral, target)) {
+    const range = neutral.attackRange + target.radius;
+    neutral.moveTarget = squaredDistance(neutral, target) > range * range
+      ? { x: target.x, y: target.y }
+      : null;
+    return;
+  }
+
+  neutral.moveTarget = (neutral.x === neutral.spawnX && neutral.y === neutral.spawnY)
+    ? null
+    : spawn;
+}
+
 function decrementCooldowns(entity: SimEntity): void {
   if (entity.attackCooldownRemaining > 0) entity.attackCooldownRemaining -= 1;
+  if (entity.wardCooldownRemaining > 0) entity.wardCooldownRemaining -= 1;
   for (const slot of ['Q', 'W', 'E', 'R'] as const) {
     if (entity.abilityCooldowns[slot] > 0) entity.abilityCooldowns[slot] -= 1;
   }
@@ -655,6 +796,94 @@ function buyItem(
   if (item.stats.moveSpeedPerTick) entity.moveSpeedPerTick += item.stats.moveSpeedPerTick;
 }
 
+function placeWard(
+  state: SimulationState,
+  hero: SimEntity,
+  x: number,
+  y: number,
+  content: AuthoritativeContentPayload,
+): void {
+  if (hero.kind !== 'hero' || hero.dead || hero.wardCooldownRemaining > 0) return;
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+
+  const target = {
+    x: clampInt(x, 0, state.width),
+    y: clampInt(y, 0, state.height),
+  };
+  const placementRangeSq = content.rules.wardPlacementRange * content.rules.wardPlacementRange;
+  if (squaredDistance(hero, target) > placementRangeSq) return;
+
+  const teamWards = Object.values(state.entities)
+    .filter((entity) => entity.kind === 'ward' && entity.team === hero.team && !entity.dead)
+    .sort((a, b) =>
+      (a.expiresAtTick ?? Number.MAX_SAFE_INTEGER) - (b.expiresAtTick ?? Number.MAX_SAFE_INTEGER) ||
+      a.id - b.id,
+    );
+  if (teamWards.length >= content.rules.maxWardsPerTeam) {
+    delete state.entities[String(teamWards[0].id)];
+  }
+
+  const id = state.nextEntityId++;
+  state.entities[String(id)] = {
+    id,
+    kind: 'ward',
+    team: hero.team,
+    ownerPlayerId: hero.ownerPlayerId,
+    heroId: null,
+    x: target.x,
+    y: target.y,
+    spawnX: target.x,
+    spawnY: target.y,
+    radius: 6,
+    moveTarget: null,
+    attackTargetId: null,
+    hp: 1,
+    maxHp: 1,
+    attackDamage: 0,
+    attackRange: 0,
+    attackCooldownTicks: 1,
+    attackCooldownRemaining: 0,
+    ...baseEntityFields(),
+    visionRadius: content.rules.wardVisionRadius,
+    expiresAtTick: state.tick + content.rules.wardDurationTicks,
+    moveSpeedPerTick: 0,
+    critChancePermille: 0,
+    aggroRange: 0,
+    dead: false,
+    respawnAtTick: null,
+    bountyGold: 0,
+    xpBounty: 0,
+    level: 1,
+    xp: 0,
+    gold: 0,
+    cs: 0,
+  };
+  hero.wardCooldownRemaining = content.rules.wardCooldownTicks;
+}
+
+function cleanupExpiredWards(state: SimulationState): void {
+  for (const entity of Object.values(state.entities)) {
+    if (entity.kind === 'ward' && entity.expiresAtTick !== null && entity.expiresAtTick <= state.tick) {
+      delete state.entities[String(entity.id)];
+    }
+  }
+}
+
+export function isPositionVisibleToTeam(
+  state: SimulationState,
+  team: SimTeam,
+  position: SimVec,
+): boolean {
+  return Object.values(state.entities)
+    .filter((entity) =>
+      !entity.dead &&
+      entity.team === team &&
+      (entity.kind === 'hero' || entity.kind === 'ward') &&
+      entity.visionRadius > 0,
+    )
+    .some((entity) => squaredDistance(entity, position) <= entity.visionRadius * entity.visionRadius);
+}
+
 function applyCommand(
   state: SimulationState,
   command: CoreSimulationCommand,
@@ -690,6 +919,9 @@ function applyCommand(
     case 'buy':
       buyItem(entity, command.itemId, content);
       break;
+    case 'place-ward':
+      placeWard(state, entity, command.x, command.y, content);
+      break;
   }
 }
 
@@ -710,8 +942,10 @@ export function createSimulation(
     nextEntityId: 1,
     entities: {},
     score: [0, 0],
+    objectiveScore: [0, 0],
     lastAcceptedSeq: {},
     laneEnabled: Boolean(options.withLane),
+    jungleEnabled: Boolean(options.withJungle),
     nextWaveTick: options.withLane ? 0 : null,
     waveNumber: 0,
     winner: null,
@@ -732,6 +966,7 @@ export function createSimulation(
     spawnTower(state, 0);
     spawnTower(state, 1);
   }
+  if (state.jungleEnabled) spawnJungle(state, content);
   return state;
 }
 
@@ -743,6 +978,7 @@ export function stepSimulation(
 ): void {
   if (state.winner !== null) return;
 
+  cleanupExpiredWards(state);
   maybeSpawnWave(state);
 
   const ordered = [...commands].sort((a, b) => {
@@ -762,6 +998,7 @@ export function stepSimulation(
 
     if (entity.kind === 'minion') updateMinionAI(state, index, entity);
     else if (entity.kind === 'tower') updateTowerAI(state, index, entity);
+    else if (entity.kind === 'monster' || entity.kind === 'objective') updateNeutralAI(state, index, entity);
 
     moveEntity(state, entity);
   }
@@ -774,6 +1011,7 @@ export function stepSimulation(
     if (!entity || entity.dead) continue;
     if (entity.kind === 'minion') updateMinionAI(state, index, entity);
     else if (entity.kind === 'tower') updateTowerAI(state, index, entity);
+    else if (entity.kind === 'monster' || entity.kind === 'objective') updateNeutralAI(state, index, entity);
     tryAttack(state, entity, content);
     if (state.winner !== null) break;
   }
