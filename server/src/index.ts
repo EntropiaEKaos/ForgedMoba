@@ -288,6 +288,11 @@ io.on('connection', (socket) => {
   const identity = socketIdentity(socket);
   const resumable = matchForUser(identity.userId);
   if (resumable) {
+    const reconnectStatus = reconnectGrace.resolveReconnect(resumable.match.id, identity.userId);
+    if (reconnectStatus === 'expired') {
+      resumable.match.runner.forfeitTeam(resumable.player.team);
+      socket.emit('game:error', { code: 'reconnect-window-expired' });
+    } else {
     const previousSocketId = resumable.player.socketId;
     if (previousSocketId && previousSocketId !== socket.id) {
       const previousSocket = io.sockets.sockets.get(previousSocketId);
@@ -300,7 +305,6 @@ io.on('connection', (socket) => {
     resumable.player.socketId = socket.id;
     identity.matchId = resumable.match.id;
     socket.join(resumable.match.id);
-    reconnectGrace.markReconnected(resumable.match.id, identity.userId);
     socket.emit('game:resumed', foundPayload(resumable.match, resumable.player));
     socket.emit('game:snapshot', resumable.match.runner.snapshot());
     for (const lease of reconnectGrace.forMatch(resumable.match.id)) {
@@ -314,6 +318,7 @@ io.on('connection', (socket) => {
       matchId: resumable.match.id,
       playerId: identity.userId,
     });
+    }
   }
 
   socket.on('net:ping', (_clientSentAt: unknown, ack?: () => void) => {
