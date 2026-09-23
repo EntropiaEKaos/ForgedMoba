@@ -229,6 +229,14 @@ class ConnectionManager {
     this.onQueueFound(data);
   };
 
+  private onSessionReplaced = () => {
+    this.lastNetworkError = 'session-replaced-by-newer-connection';
+    this.match = null;
+    this.matchResult = null;
+    this.resetNetworkMatchState();
+    this.emit();
+  };
+
   private bindSocketEvents(socket: Socket) {
     socket.on('connect', this.onSocketConnect);
     socket.on('disconnect', this.onSocketDisconnect);
@@ -240,6 +248,7 @@ class ConnectionManager {
     socket.on('game:snapshot', this.onGameSnapshot);
     socket.on('game:resumed', this.onGameResumed);
     socket.on('game:complete', this.onGameComplete);
+    socket.on('session:replaced', this.onSessionReplaced);
   }
 
   private unbindSocketEvents(socket: Socket) {
@@ -253,6 +262,7 @@ class ConnectionManager {
     socket.off('game:snapshot', this.onGameSnapshot);
     socket.off('game:resumed', this.onGameResumed);
     socket.off('game:complete', this.onGameComplete);
+    socket.off('session:replaced', this.onSessionReplaced);
   }
 
   connectSocket(token?: string) {
