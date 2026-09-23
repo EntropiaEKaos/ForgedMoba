@@ -39,6 +39,24 @@ export interface AuthoritativeItemContent {
   stats: AuthoritativeItemStats;
 }
 
+export interface AuthoritativeNeutralContent {
+  id: string;
+  kind: 'camp' | 'objective';
+  xPermille: number;
+  yPermille: number;
+  maxHp: number;
+  attackDamage: number;
+  attackRange: number;
+  attackCooldownTicks: number;
+  moveSpeedPerTick: number;
+  aggroRange: number;
+  leashRadius: number;
+  bountyGold: number;
+  xpBounty: number;
+  respawnTicks: number;
+  teamGold: number;
+}
+
 export interface AuthoritativeRulesContent {
   tickRate: number;
   startingGold: number;
@@ -47,6 +65,11 @@ export interface AuthoritativeRulesContent {
   heroRespawnTicks: number;
   heroKillGold: number;
   heroKillXp: number;
+  wardPlacementRange: number;
+  wardDurationTicks: number;
+  wardCooldownTicks: number;
+  wardVisionRadius: number;
+  maxWardsPerTeam: number;
 }
 
 export interface AuthoritativeContentPayload {
@@ -54,6 +77,7 @@ export interface AuthoritativeContentPayload {
   rules: AuthoritativeRulesContent;
   heroes: AuthoritativeHeroContent[];
   items: AuthoritativeItemContent[];
+  neutralUnits: AuthoritativeNeutralContent[];
 }
 
 export interface PublishedAuthoritativeContent {
@@ -86,9 +110,15 @@ export function validateAuthoritativeContent(payload: AuthoritativeContentPayloa
   assertInt('rules.heroRespawnTicks', payload.rules.heroRespawnTicks, 1, 100_000);
   assertInt('rules.heroKillGold', payload.rules.heroKillGold, 0, 100_000);
   assertInt('rules.heroKillXp', payload.rules.heroKillXp, 0, 100_000);
+  assertInt('rules.wardPlacementRange', payload.rules.wardPlacementRange, 1, 100_000);
+  assertInt('rules.wardDurationTicks', payload.rules.wardDurationTicks, 1, 1_000_000);
+  assertInt('rules.wardCooldownTicks', payload.rules.wardCooldownTicks, 1, 1_000_000);
+  assertInt('rules.wardVisionRadius', payload.rules.wardVisionRadius, 1, 100_000);
+  assertInt('rules.maxWardsPerTeam', payload.rules.maxWardsPerTeam, 1, 20);
 
   assertUniqueIds('heroes', payload.heroes);
   assertUniqueIds('items', payload.items);
+  assertUniqueIds('neutralUnits', payload.neutralUnits);
 
   const requiredHeroes = new Set<AuthoritativeHeroId>(['gareth', 'luxana']);
   for (const hero of payload.heroes) {
@@ -111,6 +141,22 @@ export function validateAuthoritativeContent(payload: AuthoritativeContentPayloa
   }
   if (requiredHeroes.size > 0) {
     throw new Error('Missing required authoritative heroes: ' + [...requiredHeroes].join(', '));
+  }
+
+  for (const neutral of payload.neutralUnits) {
+    assertInt(neutral.id + '.xPermille', neutral.xPermille, 0, 1000);
+    assertInt(neutral.id + '.yPermille', neutral.yPermille, 0, 1000);
+    assertInt(neutral.id + '.maxHp', neutral.maxHp, 1, 1_000_000);
+    assertInt(neutral.id + '.attackDamage', neutral.attackDamage, 0, 100_000);
+    assertInt(neutral.id + '.attackRange', neutral.attackRange, 1, 100_000);
+    assertInt(neutral.id + '.attackCooldownTicks', neutral.attackCooldownTicks, 1, 100_000);
+    assertInt(neutral.id + '.moveSpeedPerTick', neutral.moveSpeedPerTick, 0, 1_000);
+    assertInt(neutral.id + '.aggroRange', neutral.aggroRange, 1, 100_000);
+    assertInt(neutral.id + '.leashRadius', neutral.leashRadius, 1, 100_000);
+    assertInt(neutral.id + '.bountyGold', neutral.bountyGold, 0, 100_000);
+    assertInt(neutral.id + '.xpBounty', neutral.xpBounty, 0, 100_000);
+    assertInt(neutral.id + '.respawnTicks', neutral.respawnTicks, 1, 1_000_000);
+    assertInt(neutral.id + '.teamGold', neutral.teamGold, 0, 100_000);
   }
 
   for (const item of payload.items) {
@@ -154,7 +200,7 @@ export function publishAuthoritativeContent(
   });
 }
 
-export const CURRENT_AUTHORITATIVE_CONTENT = publishAuthoritativeContent('authority-0.7.0', {
+export const CURRENT_AUTHORITATIVE_CONTENT = publishAuthoritativeContent('authority-0.8.0', {
   schemaVersion: 1,
   rules: {
     tickRate: 30,
@@ -164,6 +210,11 @@ export const CURRENT_AUTHORITATIVE_CONTENT = publishAuthoritativeContent('author
     heroRespawnTicks: 150,
     heroKillGold: 300,
     heroKillXp: 120,
+    wardPlacementRange: 600,
+    wardDurationTicks: 2700,
+    wardCooldownTicks: 900,
+    wardVisionRadius: 500,
+    maxWardsPerTeam: 4,
   },
   heroes: [
     {
@@ -211,6 +262,59 @@ export const CURRENT_AUTHORITATIVE_CONTENT = publishAuthoritativeContent('author
     { id: 'ruby', name: 'Cristal de Rubi', cost: 400, stats: { maxHp: 150 } },
     { id: 'boots', name: 'Botas de Velocidade', cost: 350, stats: { moveSpeedPerTick: 1 } },
     { id: 'pickaxe', name: 'Picareta', cost: 875, stats: { attackDamage: 25 } },
+  ],
+  neutralUnits: [
+    {
+      id: 'blue-camp',
+      kind: 'camp',
+      xPermille: 350,
+      yPermille: 270,
+      maxHp: 780,
+      attackDamage: 38,
+      attackRange: 62,
+      attackCooldownTicks: 30,
+      moveSpeedPerTick: 2,
+      aggroRange: 260,
+      leashRadius: 360,
+      bountyGold: 95,
+      xpBounty: 110,
+      respawnTicks: 900,
+      teamGold: 0,
+    },
+    {
+      id: 'red-camp',
+      kind: 'camp',
+      xPermille: 650,
+      yPermille: 730,
+      maxHp: 780,
+      attackDamage: 38,
+      attackRange: 62,
+      attackCooldownTicks: 30,
+      moveSpeedPerTick: 2,
+      aggroRange: 260,
+      leashRadius: 360,
+      bountyGold: 95,
+      xpBounty: 110,
+      respawnTicks: 900,
+      teamGold: 0,
+    },
+    {
+      id: 'rift-sentinel',
+      kind: 'objective',
+      xPermille: 500,
+      yPermille: 500,
+      maxHp: 2400,
+      attackDamage: 72,
+      attackRange: 78,
+      attackCooldownTicks: 28,
+      moveSpeedPerTick: 1,
+      aggroRange: 320,
+      leashRadius: 420,
+      bountyGold: 180,
+      xpBounty: 220,
+      respawnTicks: 1800,
+      teamGold: 125,
+    },
   ],
 });
 
