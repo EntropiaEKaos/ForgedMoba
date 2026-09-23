@@ -6,10 +6,20 @@ export const WAVE_INTERVAL_TICKS = SIM_TICK_RATE * 30;
 
 export type SimTeam = 0 | 1;
 export type SimEntityKind = 'hero' | 'minion' | 'tower';
+export type SimHeroId = 'gareth' | 'luxana';
+export type SimAbilitySlot = 'Q' | 'W' | 'E' | 'R';
+export type SimStatusKind = 'stun' | 'root' | 'slow';
 
 export interface SimVec {
   x: number;
   y: number;
+}
+
+export interface SimStatus {
+  kind: SimStatusKind;
+  sourceId: EntityId;
+  expiresAtTick: number;
+  magnitudePermille: number;
 }
 
 export interface SimEntity {
@@ -17,6 +27,7 @@ export interface SimEntity {
   kind: SimEntityKind;
   team: SimTeam;
   ownerPlayerId: PlayerId | null;
+  heroId: SimHeroId | null;
   x: number;
   y: number;
   spawnX: number;
@@ -30,9 +41,12 @@ export interface SimEntity {
   attackRange: number;
   attackCooldownTicks: number;
   attackCooldownRemaining: number;
+  abilityCooldowns: Record<SimAbilitySlot, number>;
   moveSpeedPerTick: number;
   critChancePermille: number;
   aggroRange: number;
+  statuses: SimStatus[];
+  towerAggroUntilTick: number;
   dead: boolean;
   respawnAtTick: number | null;
   bountyGold: number;
@@ -44,7 +58,7 @@ export interface SimEntity {
 }
 
 export interface SimulationState {
-  version: 2;
+  version: 3;
   contentVersion: string;
   tick: number;
   seed: number;
@@ -66,6 +80,7 @@ export interface SimulationPlayerSeed {
   team: SimTeam;
   x: number;
   y: number;
+  heroId?: SimHeroId;
 }
 
 export interface CreateSimulationOptions {
