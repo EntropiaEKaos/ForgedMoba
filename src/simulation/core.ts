@@ -306,12 +306,7 @@ function shareMinionXp(state: SimulationState, victim: SimEntity, killerTeam: Si
   for (const hero of nearby) grantXp(hero, share);
 }
 
-function awardKill(
-  state: SimulationState,
-  attacker: SimEntity,
-  victim: SimEntity,
-  content: AuthoritativeContentPayload,
-): void {
+function awardKill(state: SimulationState, attacker: SimEntity, victim: SimEntity): void {
   if (attacker.kind === 'hero') {
     attacker.gold += victim.bountyGold;
     if (victim.kind === 'minion') attacker.cs += 1;
@@ -333,7 +328,7 @@ function killEntity(
   victim.attackTargetId = null;
   victim.statuses = [];
   victim.respawnAtTick = victim.kind === 'hero' ? state.tick + content.rules.heroRespawnTicks : null;
-  awardKill(state, attacker, victim, content);
+  awardKill(state, attacker, victim);
   if (victim.kind === 'tower') state.winner = attacker.team;
 }
 
