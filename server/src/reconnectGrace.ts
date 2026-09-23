@@ -26,8 +26,16 @@ export class ReconnectGraceRegistry {
     return { ...lease };
   }
 
-  markReconnected(matchId: string, playerId: string): boolean {
-    return this.leases.delete(this.key(matchId, playerId));
+  resolveReconnect(
+    matchId: string,
+    playerId: string,
+    now = Date.now(),
+  ): 'reconnected' | 'expired' | 'none' {
+    const key = this.key(matchId, playerId);
+    const lease = this.leases.get(key);
+    if (!lease) return 'none';
+    this.leases.delete(key);
+    return lease.expiresAt <= now ? 'expired' : 'reconnected';
   }
 
   consumeExpired(now = Date.now()): ReconnectLease[] {
