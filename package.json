@@ -10,9 +10,10 @@
     "typecheck": "tsc --noEmit",
     "lint:sim-boundaries": "node scripts/check-simulation-boundaries.mjs",
     "lint": "npm run lint:sim-boundaries && npm run typecheck",
-    "test": "npm run test:sim",
+    "test": "npm run test:sim && npm run test:network",
     "test:sim": "node --test --experimental-strip-types src/simulation/*.test.ts",
-    "check": "npm run lint && npm run test:sim && npm run build",
+    "test:network": "node --test --experimental-strip-types src/network/*.test.ts",
+    "check": "npm run lint && npm run test && npm run build",
     "server:dev": "npm --prefix server run dev",
     "server:typecheck": "npm --prefix server run typecheck",
     "server:test": "npm --prefix server run test"
