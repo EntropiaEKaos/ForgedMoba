@@ -76,3 +76,7 @@ jobs:
 
       - name: Authoritative runner tests
         run: npm run server:test
+
+      - name: Five-v-five load smoke
+        working-directory: server
+        run: npm run load:5v5:smoke
