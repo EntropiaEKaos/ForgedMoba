@@ -14,6 +14,7 @@ export interface FiveVFiveLoadProbeResult {
   ticksPerMatch: number;
   simulatedTicks: number;
   commandsEnqueued: number;
+  snapshotsEmitted: number;
   elapsedMs: number;
   ticksPerSecond: number;
   finalHashes: string[];
@@ -36,6 +37,7 @@ export function runFiveVFiveLoadProbe(
   const commandEveryTicks = Math.max(1, Math.trunc(options.commandEveryTicks ?? 15));
 
   const rosters = Array.from({ length: matches }, (_, index) => playersFor(index));
+  let snapshotsEmitted = 0;
   const runners = rosters.map((players, index) => {
     const matchId = 'load-probe-' + index;
     return new MatchRunner({
@@ -43,8 +45,9 @@ export function runFiveVFiveLoadProbe(
       contentVersion: CURRENT_AUTHORITATIVE_CONTENT.contentVersion,
       content: CURRENT_AUTHORITATIVE_CONTENT,
       seed: stableSeedFromMatchId(matchId),
-      snapshotEveryTicks: 10_000_000,
+      snapshotEveryTicks: 3,
       players,
+      onSnapshot: () => { snapshotsEmitted += 1; },
     });
   });
 
@@ -82,6 +85,7 @@ export function runFiveVFiveLoadProbe(
     ticksPerMatch: ticks,
     simulatedTicks,
     commandsEnqueued,
+    snapshotsEmitted,
     elapsedMs,
     ticksPerSecond: simulatedTicks / (elapsedMs / 1000),
     finalHashes: runners.map((runner) => hashSimulationState(runner.state)),
