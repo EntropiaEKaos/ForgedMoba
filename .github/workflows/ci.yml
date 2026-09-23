@@ -7,6 +7,7 @@ on:
       - main
       - 'foundation/**'
       - 'simulation/**'
+      - 'network/**'
 
 permissions:
   contents: read
@@ -42,6 +43,9 @@ jobs:
 
       - name: Determinism suite
         run: npm run test:sim
+
+      - name: Network client suite
+        run: npm run test:network
 
       - name: Production build
         run: npm run build
