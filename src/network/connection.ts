@@ -353,6 +353,16 @@ class ConnectionManager {
     return this.emitGameCommand({ type: 'stop' });
   }
 
+  sendCastQ(target: { x?: number; y?: number; targetId?: number }) {
+    return this.emitGameCommand({
+      type: 'cast',
+      slot: 'Q',
+      ...(target.x === undefined ? {} : { x: target.x }),
+      ...(target.y === undefined ? {} : { y: target.y }),
+      ...(target.targetId === undefined ? {} : { targetId: target.targetId }),
+    });
+  }
+
   onMatchFound: ((match: MatchFoundPayload) => void) | null = null;
 }
 

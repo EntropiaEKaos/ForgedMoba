@@ -1,6 +1,6 @@
 import type {
   AuthoritativeSnapshot,
-  CoreMovementCommand,
+  CoreSimulationCommand,
   PlayerCommand,
   PlayerId,
 } from '../../src/shared/protocol.ts';
@@ -42,7 +42,7 @@ function finiteInt(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? Math.trunc(value) : null;
 }
 
-function normalizeCoreCommand(playerId: PlayerId, raw: PlayerCommand): CoreMovementCommand | null {
+function normalizeCoreCommand(playerId: PlayerId, raw: PlayerCommand): CoreSimulationCommand | null {
   const seq = finiteInt(raw.seq);
   const tick = finiteInt(raw.tick);
   if (seq === null || seq < 0 || tick === null || tick < 0) return null;
@@ -56,6 +56,27 @@ function normalizeCoreCommand(playerId: PlayerId, raw: PlayerCommand): CoreMovem
     return { type: 'attack', playerId, seq, tick, targetId };
   }
   if (raw.type === 'stop') return { type: 'stop', playerId, seq, tick };
+  if (raw.type === 'cast') {
+    if (raw.slot !== 'Q') return null;
+    let targetId: number | undefined;
+    if (raw.targetId !== undefined) {
+      const parsedTargetId = finiteInt(raw.targetId);
+      if (parsedTargetId === null || parsedTargetId <= 0) return null;
+      targetId = parsedTargetId;
+    }
+    if (raw.x !== undefined && !Number.isFinite(raw.x)) return null;
+    if (raw.y !== undefined && !Number.isFinite(raw.y)) return null;
+    return {
+      type: 'cast',
+      playerId,
+      seq,
+      tick,
+      slot: 'Q',
+      x: raw.x === undefined ? undefined : Math.trunc(raw.x),
+      y: raw.y === undefined ? undefined : Math.trunc(raw.y),
+      targetId: targetId ?? undefined,
+    };
+  }
   return null;
 }
 
@@ -86,7 +107,7 @@ export class MatchRunner {
   readonly snapshotEveryTicks: number;
 
   private readonly playerIds: Set<PlayerId>;
-  private readonly queued = new Map<number, CoreMovementCommand[]>();
+  private readonly queued = new Map<number, CoreSimulationCommand[]>();
   private readonly lastQueuedSeq = new Map<PlayerId, number>();
   private readonly onSnapshot?: MatchRunnerOptions['onSnapshot'];
   private readonly onComplete?: MatchRunnerOptions['onComplete'];
@@ -130,7 +151,8 @@ export class MatchRunner {
 
   enqueue(playerId: PlayerId, command: PlayerCommand): MatchInputResult {
     if (!this.playerIds.has(playerId)) return { ok: false, code: 'unknown-player' };
-    if (!['move', 'attack', 'stop'].includes(command.type)) return { ok: false, code: 'unsupported-command' };
+    if (!['move', 'attack', 'stop', 'cast'].includes(command.type)) return { ok: false, code: 'unsupported-command' };
+    if (command.type === 'cast' && command.slot !== 'Q') return { ok: false, code: 'unsupported-command' };
     const normalized = normalizeCoreCommand(playerId, command);
     if (!normalized) return { ok: false, code: 'invalid-command' };
 

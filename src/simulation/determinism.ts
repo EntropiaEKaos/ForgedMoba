@@ -1,4 +1,4 @@
-import type { CoreMovementCommand } from '../shared/protocol.ts';
+import type { CoreSimulationCommand } from '../shared/protocol.ts';
 import { createSimulation, stepSimulation } from './core.ts';
 import { hashSimulationState } from './hash.ts';
 import type { CreateSimulationOptions } from './types.ts';
@@ -14,7 +14,7 @@ export interface DeterminismProbeResult {
 export function runDeterminismProbe(
   options: CreateSimulationOptions,
   ticks: number,
-  commandsAtTick: (tick: number) => readonly CoreMovementCommand[],
+  commandsAtTick: (tick: number) => readonly CoreSimulationCommand[],
 ): DeterminismProbeResult {
   const a = createSimulation(options);
   const b = createSimulation(options);
