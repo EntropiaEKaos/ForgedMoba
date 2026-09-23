@@ -1,9 +1,8 @@
 /**
- * ============ FASE 2: Gerenciador de Conexão Online ============
- * Conecta ao servidor Pixel Rift quando disponível, e cai graciosamente
- * para o modo Convidado (offline) quando o servidor estiver offline.
+ * ForgedMoba online connection manager.
+ * Keeps transport/session concerns outside the game simulation.
  */
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { io, type Socket } from 'socket.io-client';
 
 export type ConnStatus = 'checking' | 'online' | 'offline';
@@ -14,6 +13,13 @@ export interface SessionUser {
   username: string;
   mode: AuthMode;
   level?: number;
+}
+
+export interface MatchFoundInfo {
+  matchId: string;
+  team: 0 | 1;
+  slot: number;
+  players: { userId: string; username: string }[];
 }
 
 const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3001';
@@ -28,104 +34,174 @@ class ConnectionManager {
   mode: AuthMode = 'guest';
   user: SessionUser | null = null;
   socket: Socket | null = null;
-  serverInfo: { version?: string; players?: number } | null = null;
+  serverInfo: { version?: string; players?: number; queueSize?: number; activeMatches?: number } | null = null;
+
+  inQueue = false;
+  queuePos: number | null = null;
+  queueEta = 0;
+  activeMatch: MatchFoundInfo | null = null;
+
   private listeners = new Set<Listener>();
+  private queueHandlersBound = false;
+
+  onMatchFound: ((match: MatchFoundInfo) => void) | null = null;
 
   constructor() {
-    // tenta restaurar sessão salva
     try {
       const raw = localStorage.getItem(USER_KEY);
       if (raw) this.user = JSON.parse(raw);
-    } catch { /* ignore */ }
+      this.mode = this.user?.mode ?? 'guest';
+    } catch {
+      // Storage is optional; guest mode remains available.
+    }
   }
 
-  subscribe(fn: Listener) { this.listeners.add(fn); return () => this.listeners.delete(fn); }
-  private emit() { this.listeners.forEach(l => l()); }
+  subscribe(fn: Listener) {
+    this.listeners.add(fn);
+    return () => this.listeners.delete(fn);
+  }
 
-  /** Verifica se o servidor está online (health check). */
+  private emit() {
+    this.listeners.forEach(listener => listener());
+  }
+
   async checkServer(): Promise<boolean> {
     try {
       const ctrl = new AbortController();
-      const to = setTimeout(() => ctrl.abort(), 2500);
+      const timeout = setTimeout(() => ctrl.abort(), 2500);
       const res = await fetch(`${API_URL}/api/health`, { signal: ctrl.signal });
-      clearTimeout(to);
-      if (res.ok) {
-        const data = await res.json();
-        this.serverInfo = { version: data.version, players: data.players };
-        return true;
-      }
-      return false;
+      clearTimeout(timeout);
+      if (!res.ok) return false;
+
+      const data = await res.json();
+      this.serverInfo = {
+        version: data.version,
+        players: data.players,
+        queueSize: data.queueSize,
+        activeMatches: data.activeMatches,
+      };
+      return true;
     } catch {
       return false;
     }
   }
 
-  /** Fluxo de inicialização: tenta conectar, define status. */
   async init() {
     this.status = 'checking';
     this.emit();
+
     const up = await this.checkServer();
-    if (up) {
-      this.status = 'online';
-      // se já tem token, tenta reconectar websocket
-      const token = localStorage.getItem(TOKEN_KEY);
-      if (token && this.user?.mode === 'account') this.connectSocket(token);
-    } else {
+    if (!up) {
       this.status = 'offline';
       if (this.user?.mode !== 'guest') this.enterGuest();
+      this.emit();
+      return;
     }
+
+    this.status = 'online';
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (token && this.user?.mode === 'account') this.connectSocket(token);
     this.emit();
   }
 
-  /** Conecta o socket WebSocket para matchmaking/jogo em tempo real. */
   connectSocket(token?: string) {
     if (this.socket?.connected) return;
-    try {
-      this.socket = io(WS_URL, { auth: { token }, reconnection: true, timeout: 5000 });
-    } catch { /* ignore */ }
+
+    this.disconnectSocket();
+    const socket = io(WS_URL, {
+      auth: { token },
+      reconnection: true,
+      timeout: 5000,
+      autoConnect: true,
+    });
+    this.socket = socket;
+
+    socket.on('connect_error', () => {
+      this.inQueue = false;
+      this.queuePos = null;
+      this.emit();
+    });
+
+    this.bindQueueHandlers();
   }
 
   disconnectSocket() {
-    try { this.socket?.disconnect(); } catch { /* ignore */ }
+    if (this.socket) {
+      this.unbindQueueHandlers();
+      try {
+        this.socket.removeAllListeners();
+        this.socket.disconnect();
+      } catch {
+        // Ignore transport shutdown errors.
+      }
+    }
     this.socket = null;
+    this.queueHandlersBound = false;
+    this.inQueue = false;
+    this.queuePos = null;
+    this.queueEta = 0;
+    this.activeMatch = null;
   }
 
-  /** Entra como convidado (offline / vs bots). */
   enterGuest(name?: string) {
+    this.disconnectSocket();
     this.mode = 'guest';
-    this.user = { id: 'guest', username: name || this.user?.username || 'Convidado', mode: 'guest' };
+    this.user = {
+      id: 'guest',
+      username: name || this.user?.username || 'Convidado',
+      mode: 'guest',
+    };
+    localStorage.removeItem(TOKEN_KEY);
     localStorage.setItem(USER_KEY, JSON.stringify(this.user));
     this.emit();
   }
 
-  /** Login numa conta real (requer servidor online). */
   async login(username: string, password: string): Promise<{ ok: boolean; error?: string }> {
-    if (this.status !== 'online') return { ok: false, error: 'Servidor offline. Jogue como convidado.' };
+    if (this.status !== 'online') {
+      return { ok: false, error: 'Servidor offline. Jogue como convidado.' };
+    }
+
     try {
       const res = await fetch(`${API_URL}/api/auth/login`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),
       });
       const data = await res.json();
       if (!res.ok) return { ok: false, error: data.error || 'Falha no login' };
-      this.applyAccount(data.token, { id: data.user.id, username: data.user.username, mode: 'account', level: data.user.level });
+
+      this.applyAccount(data.token, {
+        id: data.user.id,
+        username: data.user.username,
+        mode: 'account',
+        level: data.user.level,
+      });
       return { ok: true };
     } catch {
       return { ok: false, error: 'Erro de rede' };
     }
   }
 
-  /** Registro de conta nova (requer servidor online). */
   async register(username: string, email: string, password: string): Promise<{ ok: boolean; error?: string }> {
-    if (this.status !== 'online') return { ok: false, error: 'Servidor offline. Jogue como convidado.' };
+    if (this.status !== 'online') {
+      return { ok: false, error: 'Servidor offline. Jogue como convidado.' };
+    }
+
     try {
       const res = await fetch(`${API_URL}/api/auth/register`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, email, password }),
       });
       const data = await res.json();
       if (!res.ok) return { ok: false, error: data.error || 'Falha no registro' };
-      this.applyAccount(data.token, { id: data.user.id, username: data.user.username, mode: 'account', level: data.user.level });
+
+      this.applyAccount(data.token, {
+        id: data.user.id,
+        username: data.user.username,
+        mode: 'account',
+        level: data.user.level,
+      });
       return { ok: true };
     } catch {
       return { ok: false, error: 'Erro de rede' };
@@ -147,45 +223,91 @@ class ConnectionManager {
     this.enterGuest('Convidado');
   }
 
-  get isOnline() { return this.status === 'online'; }
-
-  // ---------- Matchmaking (Fila online) ----------
-  inQueue = false;
-  queuePos: number | null = null;
-  queueEta = 0;
+  get isOnline() {
+    return this.status === 'online';
+  }
 
   joinQueue() {
-    if (!this.isOnline || !this.socket) return;
-    this.inQueue = true; this.queuePos = 0; this.emit();
-    this.socket.emit('queue:join', {});
-    this.socket.on('queue:joined', (d: { position: number; estimatedTime: number }) => {
-      this.queuePos = d.position; this.queueEta = d.estimatedTime; this.emit();
-    });
-    this.socket.on('queue:found', () => {
-      this.inQueue = false; this.queuePos = null; this.emit();
-      this.onMatchFound?.();
-    });
-    this.socket.on('queue:left', () => { this.inQueue = false; this.queuePos = null; this.emit(); });
+    if (!this.isOnline || !this.socket?.connected || this.user?.mode !== 'account') return;
+    if (this.inQueue || this.activeMatch) return;
+
+    this.bindQueueHandlers();
+    this.inQueue = true;
+    this.queuePos = 0;
+    this.emit();
+    this.socket.emit('queue:join');
   }
 
   leaveQueue() {
     if (!this.socket) return;
     this.socket.emit('queue:leave');
-    this.inQueue = false; this.queuePos = null; this.emit();
+    this.inQueue = false;
+    this.queuePos = null;
+    this.queueEta = 0;
+    this.emit();
   }
 
-  /** Callback quando uma partida online é encontrada (setado pela UI). */
-  onMatchFound: (() => void) | null = null;
+  clearActiveMatch() {
+    this.activeMatch = null;
+    this.emit();
+  }
+
+  private readonly handleQueueJoined = (data: { position: number; estimatedTime: number }) => {
+    this.queuePos = data.position;
+    this.queueEta = data.estimatedTime;
+    this.emit();
+  };
+
+  private readonly handleQueueFound = (data: MatchFoundInfo) => {
+    this.inQueue = false;
+    this.queuePos = null;
+    this.queueEta = 0;
+    this.activeMatch = data;
+    this.emit();
+    this.onMatchFound?.(data);
+  };
+
+  private readonly handleQueueLeft = () => {
+    this.inQueue = false;
+    this.queuePos = null;
+    this.queueEta = 0;
+    this.emit();
+  };
+
+  private bindQueueHandlers() {
+    if (!this.socket || this.queueHandlersBound) return;
+    this.socket.on('queue:joined', this.handleQueueJoined);
+    this.socket.on('queue:found', this.handleQueueFound);
+    this.socket.on('queue:left', this.handleQueueLeft);
+    this.queueHandlersBound = true;
+  }
+
+  private unbindQueueHandlers() {
+    if (!this.socket || !this.queueHandlersBound) return;
+    this.socket.off('queue:joined', this.handleQueueJoined);
+    this.socket.off('queue:found', this.handleQueueFound);
+    this.socket.off('queue:left', this.handleQueueLeft);
+    this.queueHandlersBound = false;
+  }
 }
 
 export const conn = new ConnectionManager();
 
-/** Hook React para componentes reagirem ao estado de conexão. */
 export function useConnection() {
-  const [, set] = useState(0);
+  const [, setVersion] = useState(0);
+
   useEffect(() => {
-    const unsub = conn.subscribe(() => set((n: number) => n + 1));
-    return () => { unsub(); };
+    const unsubscribe = conn.subscribe(() => setVersion(version => version + 1));
+    return () => {
+      unsubscribe();
+    };
   }, []);
-  return { conn, status: conn.status, user: conn.user, serverInfo: conn.serverInfo };
+
+  return {
+    conn,
+    status: conn.status,
+    user: conn.user,
+    serverInfo: conn.serverInfo,
+    activeMatch: conn.activeMatch,
+  };
 }
