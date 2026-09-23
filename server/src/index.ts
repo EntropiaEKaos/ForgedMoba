@@ -281,6 +281,15 @@ function createMatch(players: QueueEntry[], mode: Exclude<MatchMode, 'ranked5v5'
 }
 
 function launchDraft(draft: RankedDraftRoom): ActiveMatch | null {
+  for (const participant of draft.snapshot().players) {
+    const socketId = draft.socketIdFor(participant.playerId);
+    if (!socketId || !io.sockets.sockets.has(socketId)) {
+      if (socketId) draft.markDisconnected(socketId);
+      broadcastDraft(draft);
+      return null;
+    }
+  }
+
   const launchPlayers = draft.launchPlayers();
   if (!launchPlayers) return null;
 
