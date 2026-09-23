@@ -107,6 +107,7 @@ export class MatchRunner {
   readonly snapshotEveryTicks: number;
 
   private readonly playerIds: Set<PlayerId>;
+  private readonly playerTeams = new Map<PlayerId, 0 | 1>();
   private readonly queued = new Map<number, CoreSimulationCommand[]>();
   private readonly lastQueuedSeq = new Map<PlayerId, number>();
   private readonly onSnapshot?: MatchRunnerOptions['onSnapshot'];
@@ -119,6 +120,7 @@ export class MatchRunner {
     this.contentVersion = options.contentVersion;
     this.snapshotEveryTicks = Math.max(1, Math.trunc(options.snapshotEveryTicks ?? 3));
     this.playerIds = new Set(options.players.map((player) => player.playerId));
+    for (const player of options.players) this.playerTeams.set(player.playerId, player.team);
     this.onSnapshot = options.onSnapshot;
     this.onComplete = options.onComplete;
     this.state = createSimulation({
@@ -168,6 +170,15 @@ export class MatchRunner {
     return { ok: true };
   }
 
+  forfeit(playerId: PlayerId): boolean {
+    if (this.completed) return false;
+    const team = this.playerTeams.get(playerId);
+    if (team === undefined) return false;
+    this.state.winner = team === 0 ? 1 : 0;
+    this.finish();
+    return true;
+  }
+
   advanceOneTick(): void {
     if (this.completed) return;
     const tick = this.state.tick;
@@ -178,11 +189,7 @@ export class MatchRunner {
     if (this.state.tick % this.snapshotEveryTicks === 0 || this.state.winner !== null) {
       this.emitSnapshot();
     }
-    if (this.state.winner !== null) {
-      this.completed = true;
-      this.stop();
-      this.onComplete?.(this.state);
-    }
+    if (this.state.winner !== null) this.finish();
   }
 
   snapshot(): AuthoritativeSnapshot<SimulationState> {
@@ -194,6 +201,14 @@ export class MatchRunner {
       stateHash: hashSimulationState(this.state),
       state: structuredClone(this.state),
     };
+  }
+
+  private finish(): void {
+    if (this.completed) return;
+    this.completed = true;
+    this.stop();
+    this.emitSnapshot();
+    this.onComplete?.(this.state);
   }
 
   private emitSnapshot(): void {
