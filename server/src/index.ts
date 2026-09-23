@@ -67,6 +67,7 @@ interface ActiveMatch {
 interface AuthedSocketData {
   userId: string;
   username: string;
+  sessionId: string;
   matchId?: string;
   draftId?: string;
 }
@@ -512,6 +513,12 @@ app.post('/api/auth/logout', async (req, res) => {
     const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload & { sessionId?: string };
     if (typeof decoded.sessionId !== 'string') return res.status(401).json({ error: 'unauthorized' });
     await identityStore.revokeSession(decoded.sessionId);
+    for (const activeSocket of io.sockets.sockets.values()) {
+      if (socketIdentity(activeSocket).sessionId === decoded.sessionId) {
+        activeSocket.emit('session:revoked');
+        activeSocket.disconnect(true);
+      }
+    }
     metrics.inc('forged_sessions_revoked_total', { reason: 'logout' });
     return res.status(204).end();
   } catch {
@@ -533,7 +540,11 @@ io.use(async (socket, next) => {
     if (!session || session.userId !== decoded.userId) return next(new Error('session-revoked'));
     const user = await identityStore.findUserById(decoded.userId);
     if (!user) return next(new Error('unauthorized'));
-    socket.data = { userId: user.id, username: user.username } satisfies AuthedSocketData;
+    socket.data = {
+      userId: user.id,
+      username: user.username,
+      sessionId: decoded.sessionId,
+    } satisfies AuthedSocketData;
     next();
   } catch {
     next(new Error('unauthorized'));
