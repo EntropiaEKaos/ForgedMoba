@@ -1,4 +1,4 @@
-import type { EntityId, PlayerId, TeamId } from '../shared/protocol';
+import type { EntityId, PlayerId, TeamId } from '../shared/protocol.js';
 
 export interface Vec2 {
   x: number;
