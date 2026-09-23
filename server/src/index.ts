@@ -18,7 +18,7 @@ import { MatchmakingQueues, type MatchmakingEntry } from './matchmaking.ts';
 
 const PORT = Number(process.env.PORT || 3001);
 const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:5173';
-const SERVER_VERSION = '2.3.0';
+const SERVER_VERSION = '2.4.0';
 const CONTENT_MANIFEST = createContentManifest('core-0.3', {
   simulationVersion: 3,
   tickRate: SIM_TICK_RATE,
@@ -150,7 +150,7 @@ function foundPayload(match: ActiveMatch, player: MatchPlayer) {
 
 function createMatch(players: QueueEntry[], mode: MatchMode): ActiveMatch {
   const id = randomUUID();
-  const teamSize = Math.max(1, players.length / 2);
+  const teamSize = Math.max(1, Math.ceil(players.length / 2));
   const assigned = players.map<MatchPlayer>((player, index) => ({
     ...player,
     team: index < teamSize ? 0 : 1,
@@ -292,14 +292,14 @@ io.on('connection', (socket) => {
       mode: joined.mode,
       position: joined.position,
       requiredPlayers: joined.requiredPlayers,
-      estimatedTime: Math.max(5, joined.position * (mode === 'duel1v1' ? 10 : 30)),
+      estimatedTime: Math.max(5, joined.position * (joined.mode === 'duel1v1' ? 10 : 30)),
     });
 
-    const ready = matchmaking.takeReady(mode);
+    const ready = matchmaking.takeReady(joined.mode);
     if (ready) {
-      const match = createMatch(ready, mode);
+      const match = createMatch(ready, joined.mode);
       console.log(
-        '[match] criada ' + match.id + ' mode=' + mode +
+        '[match] criada ' + match.id + ' mode=' + joined.mode +
         ' jogadores=' + match.players.length + '; tick=' + SIM_TICK_RATE + 'Hz',
       );
     }
