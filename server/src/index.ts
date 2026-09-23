@@ -17,11 +17,11 @@ import { MatchRunner, stableSeedFromMatchId } from './matchRunner.ts';
 
 const PORT = Number(process.env.PORT || 3001);
 const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:5173';
-const SERVER_VERSION = '2.2.0';
-const CONTENT_MANIFEST = createContentManifest('core-0.2', {
-  simulationVersion: 2,
+const SERVER_VERSION = '2.3.0';
+const CONTENT_MANIFEST = createContentManifest('core-0.3', {
+  simulationVersion: 3,
   tickRate: SIM_TICK_RATE,
-  mode: 'single-lane-authority-v1',
+  mode: 'single-lane-authority-v2',
   minionWaveSeconds: 30,
 });
 const CONTENT_VERSION = CONTENT_MANIFEST.version + '+' + CONTENT_MANIFEST.hash;
@@ -123,6 +123,25 @@ function parsePlayerCommand(value: unknown, playerId: string): PlayerCommand | n
   return { ...raw, playerId } as PlayerCommand;
 }
 
+function matchForUser(userId: string): { match: ActiveMatch; player: MatchPlayer } | null {
+  for (const match of activeMatches.values()) {
+    const player = match.players.find((entry) => entry.userId === userId);
+    if (player) return { match, player };
+  }
+  return null;
+}
+
+function foundPayload(match: ActiveMatch, player: MatchPlayer) {
+  return {
+    matchId: match.id,
+    team: player.team,
+    slot: player.slot,
+    playerId: player.userId,
+    contentVersion: CONTENT_VERSION,
+    serverTickRate: SIM_TICK_RATE,
+  };
+}
+
 function createMatch(players: QueueEntry[]): ActiveMatch {
   const id = randomUUID();
   const assigned = players.map<MatchPlayer>((player, index) => ({
@@ -136,7 +155,18 @@ function createMatch(players: QueueEntry[]): ActiveMatch {
     seed: stableSeedFromMatchId(id),
     players: assigned.map((player) => ({ playerId: player.userId, team: player.team, slot: player.slot })),
     onSnapshot: (snapshot) => io.to(id).emit('game:snapshot', snapshot),
-    onComplete: (state) => console.log('[match] concluída ' + id + ' vencedor=' + state.winner),
+    onComplete: (state) => {
+      console.log('[match] concluída ' + id + ' vencedor=' + state.winner);
+      io.to(id).emit('game:complete', { matchId: id, winner: state.winner });
+      const completed = activeMatches.get(id);
+      if (completed) {
+        for (const participant of completed.players) {
+          const participantSocket = io.sockets.sockets.get(participant.socketId);
+          if (participantSocket) delete socketIdentity(participantSocket).matchId;
+        }
+      }
+      activeMatches.delete(id);
+    },
   });
   const match: ActiveMatch = { id, players: assigned, createdAt: Date.now(), runner };
   activeMatches.set(id, match);
@@ -146,14 +176,7 @@ function createMatch(players: QueueEntry[]): ActiveMatch {
     if (!playerSocket) continue;
     playerSocket.join(id);
     socketIdentity(playerSocket).matchId = id;
-    playerSocket.emit('queue:found', {
-      matchId: id,
-      team: player.team,
-      slot: player.slot,
-      playerId: player.userId,
-      contentVersion: CONTENT_VERSION,
-      serverTickRate: SIM_TICK_RATE,
-    });
+    playerSocket.emit('queue:found', foundPayload(match, player));
   }
   io.to(id).emit('game:snapshot', runner.snapshot());
   runner.start();
@@ -230,6 +253,19 @@ io.use((socket, next) => {
 
 io.on('connection', (socket) => {
   const identity = socketIdentity(socket);
+  const resumable = matchForUser(identity.userId);
+  if (resumable) {
+    resumable.player.socketId = socket.id;
+    identity.matchId = resumable.match.id;
+    socket.join(resumable.match.id);
+    socket.emit('game:resumed', foundPayload(resumable.match, resumable.player));
+    socket.emit('game:snapshot', resumable.match.runner.snapshot());
+  }
+
+  socket.on('net:ping', (_clientSentAt: unknown, ack?: () => void) => {
+    if (typeof ack === 'function') ack();
+  });
+
   console.log('[socket] conectado: ' + identity.username + ' (' + socket.id + ')');
 
   socket.on('queue:join', () => {

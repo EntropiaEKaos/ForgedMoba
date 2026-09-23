@@ -4,8 +4,15 @@
  */
 import { useEffect, useState } from 'react';
 import { io, type Socket } from 'socket.io-client';
-import type { AuthoritativeSnapshot, MatchFoundPayload } from '../shared/protocol.ts';
+import type {
+  AuthoritativeSnapshot,
+  CoreSimulationCommand,
+  MatchFoundPayload,
+} from '../shared/protocol.ts';
 import type { SimulationState } from '../simulation/types.ts';
+import { SnapshotInterpolationBuffer, type InterpolatedFrame } from './interpolation.ts';
+import { ClientPrediction } from './prediction.ts';
+import { NetworkTelemetry, type NetworkMetricsSnapshot } from './telemetry.ts';
 
 export type ConnStatus = 'checking' | 'online' | 'offline';
 export type AuthMode = 'guest' | 'account';
@@ -23,6 +30,8 @@ const TOKEN_KEY = 'pixelrift_token';
 const USER_KEY = 'pixelrift_user';
 
 type Listener = () => void;
+type StripCommandEnvelope<T> = T extends unknown ? Omit<T, 'playerId' | 'seq' | 'tick'> : never;
+type LocalSimulationCommand = StripCommandEnvelope<CoreSimulationCommand>;
 type QueueJoinedPayload = { position: number; estimatedTime: number };
 type GameErrorPayload = { code?: string };
 
@@ -38,9 +47,15 @@ class ConnectionManager {
   match: MatchFoundPayload | null = null;
   lastNetworkError: string | null = null;
   authoritativeSnapshot: AuthoritativeSnapshot<SimulationState> | null = null;
+  predictedState: SimulationState | null = null;
 
   private snapshotReceivedAt = 0;
   private nextInputSeq = 1;
+  private prediction: ClientPrediction | null = null;
+  private interpolation = new SnapshotInterpolationBuffer(24);
+  private telemetry = new NetworkTelemetry(40);
+  private pingTimer: ReturnType<typeof setInterval> | null = null;
+  private readonly interpolationDelayTicks = 4;
   private listeners = new Set<Listener>();
 
   constructor() {
@@ -128,8 +143,8 @@ class ConnectionManager {
     this.queuePos = null;
     this.queueEta = 0;
     this.match = data;
-    this.authoritativeSnapshot = null;
-    this.snapshotReceivedAt = 0;
+    this.resetNetworkMatchState();
+    this.prediction = new ClientPrediction(data.playerId);
     this.nextInputSeq = 1;
     this.emit();
     this.onMatchFound?.(data);
@@ -160,27 +175,57 @@ class ConnectionManager {
       this.emit();
       return;
     }
+
+    const now = performance.now();
     this.authoritativeSnapshot = snapshot;
-    this.snapshotReceivedAt = performance.now();
+    this.snapshotReceivedAt = now;
+    this.interpolation.push(snapshot);
+    this.telemetry.recordSnapshot(now, snapshot.serverTick, 3);
+
+    if (!this.prediction) this.prediction = new ClientPrediction(this.match.playerId);
+    const reconciliation = this.prediction.acceptSnapshot(snapshot, this.estimatedServerTick());
+    this.telemetry.recordCorrection(reconciliation.correctionDistance);
+    this.predictedState = this.prediction.predictThrough(this.estimatedServerTick());
     this.emit();
   };
 
+  private onSocketConnect = () => {
+    this.startPingLoop();
+    this.lastNetworkError = null;
+    this.emit();
+  };
+
+  private onSocketDisconnect = () => {
+    this.stopPingLoop();
+    this.emit();
+  };
+
+  private onGameResumed = (data: MatchFoundPayload) => {
+    this.onQueueFound(data);
+  };
+
   private bindSocketEvents(socket: Socket) {
+    socket.on('connect', this.onSocketConnect);
+    socket.on('disconnect', this.onSocketDisconnect);
     socket.on('queue:joined', this.onQueueJoined);
     socket.on('queue:found', this.onQueueFound);
     socket.on('queue:left', this.onQueueLeft);
     socket.on('connect_error', this.onConnectError);
     socket.on('game:error', this.onGameError);
     socket.on('game:snapshot', this.onGameSnapshot);
+    socket.on('game:resumed', this.onGameResumed);
   }
 
   private unbindSocketEvents(socket: Socket) {
+    socket.off('connect', this.onSocketConnect);
+    socket.off('disconnect', this.onSocketDisconnect);
     socket.off('queue:joined', this.onQueueJoined);
     socket.off('queue:found', this.onQueueFound);
     socket.off('queue:left', this.onQueueLeft);
     socket.off('connect_error', this.onConnectError);
     socket.off('game:error', this.onGameError);
     socket.off('game:snapshot', this.onGameSnapshot);
+    socket.off('game:resumed', this.onGameResumed);
   }
 
   connectSocket(token?: string) {
@@ -210,13 +255,44 @@ class ConnectionManager {
       // desconexão best-effort
     }
     this.socket = null;
+    this.stopPingLoop();
+  }
+
+  private resetNetworkMatchState() {
+    this.authoritativeSnapshot = null;
+    this.predictedState = null;
+    this.snapshotReceivedAt = 0;
+    this.prediction?.reset();
+    this.prediction = null;
+    this.interpolation.clear();
+    this.telemetry.reset();
+  }
+
+  private startPingLoop() {
+    this.stopPingLoop();
+    const measure = () => {
+      const socket = this.socket;
+      if (!socket?.connected) return;
+      const started = performance.now();
+      socket.emit('net:ping', Date.now(), () => {
+        this.telemetry.recordRtt(performance.now() - started);
+        this.emit();
+      });
+    };
+    measure();
+    this.pingTimer = setInterval(measure, 2000);
+  }
+
+  private stopPingLoop() {
+    if (this.pingTimer) clearInterval(this.pingTimer);
+    this.pingTimer = null;
   }
 
   enterGuest(name?: string) {
     this.disconnectSocket();
     this.mode = 'guest';
     this.match = null;
-    this.authoritativeSnapshot = null;
+    this.resetNetworkMatchState();
     this.user = {
       id: 'guest',
       username: name || this.user?.username || 'Convidado',
@@ -275,7 +351,7 @@ class ConnectionManager {
     this.mode = 'account';
     this.user = user;
     this.match = null;
-    this.authoritativeSnapshot = null;
+    this.resetNetworkMatchState();
     localStorage.setItem(TOKEN_KEY, token);
     localStorage.setItem(USER_KEY, JSON.stringify(user));
     this.connectSocket(token);
@@ -289,7 +365,7 @@ class ConnectionManager {
     this.queuePos = null;
     this.queueEta = 0;
     this.match = null;
-    this.authoritativeSnapshot = null;
+    this.resetNetworkMatchState();
     this.enterGuest('Convidado');
   }
 
@@ -300,7 +376,7 @@ class ConnectionManager {
   joinQueue() {
     if (!this.isOnline || !this.socket || this.user?.mode !== 'account') return;
     this.match = null;
-    this.authoritativeSnapshot = null;
+    this.resetNetworkMatchState();
     this.lastNetworkError = null;
     this.inQueue = true;
     this.queuePos = 0;
@@ -319,7 +395,7 @@ class ConnectionManager {
 
   clearMatch() {
     this.match = null;
-    this.authoritativeSnapshot = null;
+    this.resetNetworkMatchState();
     this.snapshotReceivedAt = 0;
     this.emit();
   }
@@ -327,17 +403,23 @@ class ConnectionManager {
   private estimatedServerTick(): number {
     if (!this.match || !this.authoritativeSnapshot) return 0;
     const elapsedMs = Math.max(0, performance.now() - this.snapshotReceivedAt);
-    return this.authoritativeSnapshot.serverTick + Math.floor(elapsedMs / (1000 / this.match.serverTickRate));
+    const halfRtt = (this.telemetry.snapshot().rttMs ?? 0) / 2;
+    return this.authoritativeSnapshot.serverTick +
+      Math.floor((elapsedMs + halfRtt) / (1000 / this.match.serverTickRate));
   }
 
-  private emitGameCommand(command: Record<string, unknown>) {
+  private emitGameCommand(command: LocalSimulationCommand) {
     if (!this.socket || !this.match || !this.user || this.user.mode !== 'account') return false;
     const seq = this.nextInputSeq++;
     const tick = this.estimatedServerTick();
+    const full = { ...command, playerId: this.user.id, seq, tick } as CoreSimulationCommand;
+    this.prediction?.record(full);
+    this.predictedState = this.prediction?.predictThrough(tick) ?? this.predictedState;
     this.socket.emit('game:input', {
       matchId: this.match.matchId,
-      command: { ...command, playerId: this.user.id, seq, tick },
+      command: full,
     });
+    this.emit();
     return true;
   }
 
@@ -363,6 +445,20 @@ class ConnectionManager {
     });
   }
 
+  getInterpolatedFrame(): InterpolatedFrame | null {
+    const latest = this.interpolation.latestTick;
+    if (latest === null) return null;
+    return this.interpolation.sample(Math.max(0, this.estimatedServerTick() - this.interpolationDelayTicks));
+  }
+
+  getNetworkMetrics(): NetworkMetricsSnapshot {
+    return this.telemetry.snapshot();
+  }
+
+  get pendingInputs(): number {
+    return this.prediction?.pendingCount ?? 0;
+  }
+
   onMatchFound: ((match: MatchFoundPayload) => void) | null = null;
 }
 
@@ -384,5 +480,8 @@ export function useConnection() {
     match: conn.match,
     networkError: conn.lastNetworkError,
     authoritativeSnapshot: conn.authoritativeSnapshot,
+    predictedState: conn.predictedState,
+    networkMetrics: conn.getNetworkMetrics(),
+    pendingInputs: conn.pendingInputs,
   };
 }
