@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.tmp-sim/
+.DS_Store
+.env
+.env.*
+!.env.example
+server/node_modules/
