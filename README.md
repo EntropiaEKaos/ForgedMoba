@@ -1,8 +1,8 @@
 # ⚔️ Pixel Rift — MOBA Cartoon 2D Épico (5v5)
 
-[![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](#)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.3-blue.svg)](#)
-[![React](https://img.shields.io/badge/React-18.2-cyan.svg)](#)
+[![ForgedMoba CI](https://github.com/EntropiaEKaos/ForgedMoba/actions/workflows/ci.yml/badge.svg)](https://github.com/EntropiaEKaos/ForgedMoba/actions/workflows/ci.yml)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue.svg)](#)
+[![React](https://img.shields.io/badge/React-19.2-cyan.svg)](#)
 [![Socket.io](https://img.shields.io/badge/Socket.io-4.6-lightgrey.svg)](#)
 
 **Pixel Rift** é um MOBA 2D completo, super expressivo e de alto impacto visual, com estilo artístico inspirado nos traços grossos, cel-shading e cabeças gigantes de **Awesomenauts**, mecânicas consagradas de **League of Legends** (Summoner's Rift espelhado, T1/T2/T3, Dragão, Barão, Inibidores e Arbustos/Invisibilidade) e a profundidade de jogo de **Dota** (Deny de minions, Buyback e Runas de Poder periódicas no Rio).
