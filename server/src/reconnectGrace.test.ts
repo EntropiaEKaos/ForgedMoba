@@ -29,3 +29,15 @@ test('clearMatch removes every lease owned by the completed match only', () => {
   assert.equal(registry.get('m1', 'b'), null);
   assert.ok(registry.get('m2', 'c'));
 });
+
+
+test('forMatch returns active leases in stable deadline/player order', () => {
+  const registry = new ReconnectGraceRegistry(30_000);
+  registry.markDisconnected('m1', 'z-player', 0, 2_000);
+  registry.markDisconnected('m1', 'a-player', 1, 1_000);
+  registry.markDisconnected('m2', 'other', 0, 500);
+  assert.deepEqual(
+    registry.forMatch('m1').map((lease) => lease.playerId),
+    ['a-player', 'z-player'],
+  );
+});
