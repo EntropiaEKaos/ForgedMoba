@@ -303,6 +303,13 @@ io.on('connection', (socket) => {
     reconnectGrace.markReconnected(resumable.match.id, identity.userId);
     socket.emit('game:resumed', foundPayload(resumable.match, resumable.player));
     socket.emit('game:snapshot', resumable.match.runner.snapshot());
+    for (const lease of reconnectGrace.forMatch(resumable.match.id)) {
+      socket.emit('game:player-disconnected', {
+        matchId: resumable.match.id,
+        playerId: lease.playerId,
+        reconnectDeadline: lease.expiresAt,
+      });
+    }
     socket.to(resumable.match.id).emit('game:player-reconnected', {
       matchId: resumable.match.id,
       playerId: identity.userId,
