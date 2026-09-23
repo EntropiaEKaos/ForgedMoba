@@ -57,7 +57,7 @@ function validateState(value: unknown): IdentityState {
 }
 
 export class MemoryIdentityStore implements IdentityStore {
-  readonly kind = 'memory' as const;
+  readonly kind: 'memory' | 'file' = 'memory';
   protected state: IdentityState;
 
   constructor(initial?: IdentityState) {
@@ -82,9 +82,15 @@ export class MemoryIdentityStore implements IdentityStore {
   }
 
   async createUser(user: IdentityUser): Promise<void> {
-    if (await this.findUserById(user.id)) throw new Error('duplicate-user-id');
-    if (await this.findUserByUsername(user.username)) throw new Error('duplicate-username');
-    if (await this.findUserByEmail(user.email)) throw new Error('duplicate-email');
+    const usernameKey = normalizeIdentity(user.username);
+    const emailKey = normalizeIdentity(user.email);
+    if (this.state.users.some((entry) => entry.id === user.id)) throw new Error('duplicate-user-id');
+    if (this.state.users.some((entry) => normalizeIdentity(entry.username) === usernameKey)) {
+      throw new Error('duplicate-username');
+    }
+    if (this.state.users.some((entry) => normalizeIdentity(entry.email) === emailKey)) {
+      throw new Error('duplicate-email');
+    }
     this.state.users.push(clone(user));
     await this.persist();
   }
@@ -120,7 +126,7 @@ export class MemoryIdentityStore implements IdentityStore {
 }
 
 export class FileIdentityStore extends MemoryIdentityStore {
-  readonly kind = 'file' as const;
+  override readonly kind: 'memory' | 'file' = 'file';
   private readonly filePath: string;
   private writeChain: Promise<void> = Promise.resolve();
 
