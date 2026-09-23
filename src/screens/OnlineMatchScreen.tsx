@@ -13,6 +13,7 @@ export function OnlineMatchScreen() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const {
     match,
+    matchResult,
     user,
     authoritativeSnapshot,
     networkMetrics,
@@ -72,17 +73,25 @@ export function OnlineMatchScreen() {
 
     const onContextMenu = (event: MouseEvent) => {
       event.preventDefault();
+      if (conn.matchResult) return;
       const world = screenToWorld(event.clientX, event.clientY);
       conn.sendMove(world.x, world.y);
     };
 
     const onClick = (event: MouseEvent) => {
+      if (conn.matchResult) return;
       const world = screenToWorld(event.clientX, event.clientY);
       const targetId = nearestEnemyId(world.x, world.y);
       if (targetId !== null) conn.sendAttack(targetId);
     };
 
     const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        if (conn.matchResult) conn.clearMatch();
+        else conn.leaveMatch();
+        return;
+      }
+      if (conn.matchResult) return;
       if (event.key === 's' || event.key === 'S') conn.sendStop();
       if (event.key === 'q' || event.key === 'Q') {
         const state = conn.predictedState ?? conn.authoritativeSnapshot?.state;
@@ -94,9 +103,6 @@ export function OnlineMatchScreen() {
         } else {
           conn.sendCastQ({ x: pointerWorld.x, y: pointerWorld.y });
         }
-      }
-      if (event.key === 'Escape') {
-        conn.clearMatch();
       }
     };
 
@@ -204,7 +210,8 @@ export function OnlineMatchScreen() {
       <canvas ref={canvasRef} className="absolute inset-0 cursor-crosshair" />
       <div className="absolute top-3 left-3 z-10 bg-[#09131a]/90 border-2 border-[#28434d] px-3 py-2 font-mono text-xs min-w-64">
         <div className="font-pixel text-[9px] text-[#e8c860] mb-2">FORGED MOBA · AUTHORITATIVE ONLINE</div>
-        <div>match {match.matchId.slice(0, 8)} · team {match.team} · slot {match.slot}</div>
+        <div>{match.mode === 'duel1v1' ? 'DUEL 1V1' : 'RANKED 5V5'} · match {match.matchId.slice(0, 8)}</div>
+        <div>team {match.team} · slot {match.slot}</div>
         <div>tick {authoritativeSnapshot?.serverTick ?? '—'} · {match.serverTickRate} Hz · snapshots ~10 Hz</div>
         <div>RTT {networkMetrics.rttMs === null ? '—' : networkMetrics.rttMs.toFixed(1)} ms · jitter {networkMetrics.jitterMs.toFixed(1)} ms</div>
         <div>correction {networkMetrics.correctionDistance.toFixed(2)} · pending {pendingInputs}</div>
@@ -218,11 +225,30 @@ export function OnlineMatchScreen() {
       </div>
 
       <button
-        onClick={() => conn.clearMatch()}
+        onClick={() => matchResult ? conn.clearMatch() : conn.leaveMatch()}
         className="absolute top-3 right-3 z-10 bg-[#3b1717] border-2 border-[#7f3737] px-3 py-2 font-pixel text-[8px] text-[#ffb0a0]"
       >
-        SAIR DO SLICE
+        {matchResult ? 'VOLTAR AO LOBBY' : 'ABANDONAR PARTIDA'}
       </button>
+
+      {matchResult && (
+        <div className="absolute inset-0 z-20 bg-black/65 flex items-center justify-center">
+          <div className="pixel-panel bg-[#0d151c] border-4 border-[#e8c860] p-8 text-center min-w-80">
+            <div className="font-pixel text-[20px] text-[#e8c860] mb-3">
+              {matchResult.winner === match.team ? 'VITÓRIA' : matchResult.winner === null ? 'PARTIDA ENCERRADA' : 'DERROTA'}
+            </div>
+            <div className="text-[#9ab0b8] mb-5">
+              Resultado confirmado pelo servidor autoritativo.
+            </div>
+            <button
+              onClick={() => conn.clearMatch()}
+              className="font-pixel text-[9px] px-6 py-3 bg-[#294d3b] border-2 border-[#4f8d68] text-[#c8ffe0]"
+            >
+              VOLTAR AO LOBBY
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

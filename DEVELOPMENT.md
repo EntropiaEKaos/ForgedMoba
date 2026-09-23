@@ -56,7 +56,7 @@ The existing game is a feature-rich offline prototype. The migration strategy is
 - [x] MatchRunner accepts Q while continuing to reject unsupported W/E/R authority.
 - [x] branch CI + PR CI + post-merge CI green on main @ 50c4ff6622ac69bd07e2b344b9e7f42018131924.
 
-## Network Client 0.4 — current branch
+## Network Client 0.4 — certified and merged
 
 - [x] local prediction reusing the deterministic authoritative simulation.
 - [x] reconciliation from server input acknowledgements with pending-input replay.
@@ -66,12 +66,24 @@ The existing game is a feature-rich offline prototype. The migration strategy is
 - [x] reconnect resumes an active in-memory match and sends a fresh authoritative snapshot.
 - [x] network client regression suite added to CI.
 - [x] content manifest advanced to simulation v3/core-0.3.
-- [ ] branch CI + PR CI + post-merge main CI certification.
+- [x] branch CI + PR CI + post-merge main CI green on main @ ca0dbcc6b2c64156852ec0bb29909b77fa6c9217.
 - [ ] follow-up security/dependency audit for the npm vulnerabilities surfaced by CI; no forced upgrade will be merged without compatibility verification.
+
+## Multiplayer 0.5 — current branch
+
+- [x] explicit `duel1v1` and `ranked5v5` protocol modes.
+- [x] isolated/tested matchmaking queues with exact readiness thresholds (2 / 10).
+- [x] duplicate socket and duplicate-account queue occupancy prevention.
+- [x] same MatchRunner powers Duel and Ranked foundation.
+- [x] Duel is selectable directly from the multiplayer lobby.
+- [x] authoritative forfeit lifecycle and server-owned winner.
+- [x] game-complete result screen before returning to lobby.
+- [x] reconnect replaces the previous controlling socket instead of creating dual control.
+- [x] match room membership and identity are cleaned on completion.
+- [ ] branch CI + PR CI + post-merge main CI certification.
 
 ## Multiplayer milestones
 
-- [ ] 0.5: real authoritative 1v1 vertical slice in the game UI.
 - [ ] 0.6: 3v3 reliability + reconnect.
 - [ ] 0.7: abilities/items/content publishing bound to content hash.
 - [ ] 0.8: jungle/objectives/wards under server authority.

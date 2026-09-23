@@ -450,9 +450,12 @@ function SkinsModal({ profile, onClose, onUpdate }: { profile: Profile; onClose:
 
 // ================= MULTIPLAYER LOBBY =================
 function MultiplayerLobby({ onPlay }: { onPlay: () => void }) {
-  const { conn, status } = useConnection();
+  const { conn, status, queueMode, queueRequiredPlayers } = useConnection();
   const [tick, setTick] = useState(0);
-  useEffect(() => { const i = setInterval(() => setTick(t => t + 1), 500); return () => clearInterval(i); }, []);
+  useEffect(() => {
+    const interval = setInterval(() => setTick(value => value + 1), 500);
+    return () => clearInterval(interval);
+  }, []);
 
   if (status !== 'online') {
     return (
@@ -460,67 +463,100 @@ function MultiplayerLobby({ onPlay }: { onPlay: () => void }) {
         <div className="text-5xl mb-3">🌐</div>
         <h2 className="font-pixel text-[11px] text-[#e8c860] mb-2">MULTIPLAYER INDISPONÍVEL</h2>
         <p className="text-[15px] text-[#9ab0b8] mb-2 leading-snug">
-          O servidor online está offline. Para jogar multiplayer real (5v5 com outras pessoas),
-          é preciso iniciar o servidor backend localizado na pasta <code className="text-[#80e0a0]">/server</code>.
+          O servidor autoritativo está offline. O modo treino local continua disponível sem alterar o progresso online.
         </p>
         <div className="bg-[#0d151c] border border-[#223038] p-3 my-4 text-left text-[13px] text-[#7a909a] font-body">
-          <div className="text-[#5ad0c0] font-pixel text-[8px] mb-1">▶ COMO ATIVAR:</div>
-          <div>1. <code className="text-[#e8d8b0]">cd server && npm install</code></div>
-          <div>2. Suba Postgres + Redis (Docker)</div>
-          <div>3. <code className="text-[#e8d8b0]">npm run db:migrate</code></div>
-          <div>4. <code className="text-[#e8d8b0]">npm run dev</code> (porta 3001)</div>
+          <div className="text-[#5ad0c0] font-pixel text-[8px] mb-1">▶ DESENVOLVIMENTO LOCAL</div>
+          <div>1. <code className="text-[#e8d8b0]">cd server</code></div>
+          <div>2. <code className="text-[#e8d8b0]">npm install</code></div>
+          <div>3. <code className="text-[#e8d8b0]">npm run dev</code> (porta 3001)</div>
         </div>
         <button onClick={onPlay} className="font-pixel text-[10px] px-6 py-3 bg-[#1a2c40] text-[#80c0ff] border-2 border-[#2a4a6c] hover:bg-[#22344a] transition-all">
-          🤖 ENQUANTO ISSO, JOGAR VS BOTS
+          🤖 JOGAR VS BOTS
         </button>
       </div>
     );
   }
 
-  // Servidor online — lobby de matchmaking
+  const queueLabel = queueMode === 'duel1v1' ? 'DUELO 1V1' : 'RANQUEADA 5V5';
+
   return (
-    <div className="max-w-2xl mx-auto space-y-4">
-      <div className="pixel-panel bg-[#101820] p-6 text-center">
-        <div className="text-5xl mb-3">⚔️</div>
-        <h2 className="font-pixel text-[12px] text-[#e8c860] mb-1">PARTIDA RANQUEADA 5v5</h2>
-        <p className="text-[14px] text-[#9ab0b8] mb-4">Encontre 9 outros invocadores para uma partida no Summoner's Rift</p>
-
-        {conn.inQueue ? (
-          <div className="space-y-3">
-            <div className="font-pixel text-[14px] text-[#5ad0c0] animate-pulse">🔍 PROCURANDO PARTIDA...</div>
-            <div className="flex justify-center gap-1">
-              {[0, 1, 2, 3, 4].map(i => (
-                <div key={i} className="w-3 h-8 bg-[#2a4a6c]" style={{ opacity: 0.3 + Math.abs(Math.sin(tick * 0.5 + i)) * 0.7 }} />
-              ))}
-            </div>
-            <div className="text-[14px] text-[#9ab0b8]">
-              Posição na fila: <b className="text-[#e8c860]">{conn.queuePos ?? '—'}</b>
-              {conn.queueEta > 0 && <> · ~{conn.queueEta}s estimado</>}
-            </div>
-            <button onClick={() => conn.leaveQueue()} className="font-pixel text-[9px] px-6 py-2 bg-[#5c1e1e] text-[#ffc0b0] border-2 border-[#8c3a3a] hover:bg-[#7c2a2a] transition-all">
-              ✖ CANCELAR
-            </button>
-          </div>
-        ) : (
-          <button onClick={() => conn.joinQueue()} className="font-pixel text-[10px] px-10 py-4 bg-[#2e6a3a] text-[#c0ffc0] border-2 border-[#40c060] hover:bg-[#3a8c4a] hover:-translate-y-0.5 transition-all hard-shadow-gold">
-            🔎 ENCONTRAR PARTIDA
+    <div className="max-w-3xl mx-auto space-y-4">
+      <div className="grid md:grid-cols-2 gap-4">
+        <div className="pixel-panel bg-[#101820] p-5 text-center border-[#6a4f24]">
+          <div className="text-4xl mb-2">⚔️</div>
+          <h2 className="font-pixel text-[11px] text-[#e8c860] mb-2">DUELO AUTORITATIVO 1V1</h2>
+          <p className="text-[14px] text-[#9ab0b8] min-h-12">
+            Vertical slice real para validar prediction, reconciliation, Q, lane, torre e vitória com apenas 2 contas.
+          </p>
+          <button
+            disabled={conn.inQueue}
+            onClick={() => conn.joinQueue('duel1v1')}
+            className="mt-4 w-full font-pixel text-[9px] py-3 bg-[#61431f] text-[#ffe9a6] border-2 border-[#a77a31] disabled:opacity-40 hover:bg-[#795528]"
+          >
+            ⚔ ENTRAR NO DUELO
           </button>
-        )}
+        </div>
+
+        <div className="pixel-panel bg-[#101820] p-5 text-center">
+          <div className="text-4xl mb-2">🏰</div>
+          <h2 className="font-pixel text-[11px] text-[#5ad0c0] mb-2">RANQUEADA 5V5 — FUNDAÇÃO</h2>
+          <p className="text-[14px] text-[#9ab0b8] min-h-12">
+            Preserva a fila de 10 jogadores para a evolução do MOBA completo; ainda usa o slice de lane autoritativo.
+          </p>
+          <button
+            disabled={conn.inQueue}
+            onClick={() => conn.joinQueue('ranked5v5')}
+            className="mt-4 w-full font-pixel text-[9px] py-3 bg-[#245237] text-[#c0ffd8] border-2 border-[#3c8a59] disabled:opacity-40 hover:bg-[#2f6847]"
+          >
+            🔎 ENTRAR NA FILA 5V5
+          </button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      {conn.inQueue && (
+        <div className="pixel-panel bg-[#0c151d] p-5 text-center">
+          <div className="font-pixel text-[11px] text-[#e8c860] animate-pulse">PROCURANDO · {queueLabel}</div>
+          <div className="flex justify-center gap-1 my-3">
+            {[0, 1, 2, 3, 4].map(index => (
+              <div
+                key={index}
+                className="w-3 h-8 bg-[#2a4a6c]"
+                style={{ opacity: 0.3 + Math.abs(Math.sin(tick * 0.5 + index)) * 0.7 }}
+              />
+            ))}
+          </div>
+          <div className="text-[14px] text-[#9ab0b8]">
+            Posição: <b className="text-[#e8c860]">{conn.queuePos ?? '—'}</b>
+            {' · '}alvo: <b className="text-[#5ad0c0]">{queueRequiredPlayers || (queueMode === 'duel1v1' ? 2 : 10)} jogadores</b>
+            {conn.queueEta > 0 && <> · ~{conn.queueEta}s estimado</>}
+          </div>
+          <button
+            onClick={() => conn.leaveQueue()}
+            className="mt-3 font-pixel text-[9px] px-6 py-2 bg-[#5c1e1e] text-[#ffc0b0] border-2 border-[#8c3a3a] hover:bg-[#7c2a2a]"
+          >
+            ✖ CANCELAR
+          </button>
+        </div>
+      )}
+
+      <div className="grid grid-cols-3 gap-3">
         <div className="pixel-panel bg-[#101820] p-4 text-center">
-          <div className="font-pixel text-[9px] text-[#5ad0c0] mb-1">JOGADORES ONLINE</div>
-          <div className="font-pixel text-[18px] text-[#80e0a0]">{conn.serverInfo?.players ?? '?'}</div>
+          <div className="font-pixel text-[8px] text-[#5ad0c0] mb-1">JOGADORES ONLINE</div>
+          <div className="font-pixel text-[16px] text-[#80e0a0]">{conn.serverInfo?.players ?? '?'}</div>
         </div>
         <div className="pixel-panel bg-[#101820] p-4 text-center">
-          <div className="font-pixel text-[9px] text-[#5ad0c0] mb-1">MODO DE CONTA</div>
-          <div className="font-pixel text-[12px] text-[#e8c860] mt-1.5">{conn.user?.mode === 'account' ? 'LOGADO' : 'CONVIDADO'}</div>
+          <div className="font-pixel text-[8px] text-[#5ad0c0] mb-1">MATCHES ATIVOS</div>
+          <div className="font-pixel text-[16px] text-[#e8c860]">{conn.serverInfo?.activeMatches ?? 0}</div>
+        </div>
+        <div className="pixel-panel bg-[#101820] p-4 text-center">
+          <div className="font-pixel text-[8px] text-[#5ad0c0] mb-1">CONTA</div>
+          <div className="font-pixel text-[10px] text-[#e8c860] mt-1.5">{conn.user?.mode === 'account' ? 'LOGADO' : 'CONVIDADO'}</div>
         </div>
       </div>
 
-      <button onClick={onPlay} className="w-full font-pixel text-[9px] py-3 bg-[#1a2430] text-[#a0d0ff] border-2 border-[#2a4a6c] hover:bg-[#22344a] transition-all">
-        🤖 OU JOGAR UMA PARTIDA TREINO VS BOTS
+      <button onClick={onPlay} className="w-full font-pixel text-[9px] py-3 bg-[#1a2430] text-[#a0d0ff] border-2 border-[#2a4a6c] hover:bg-[#22344a]">
+        🤖 PARTIDA TREINO VS BOTS
       </button>
     </div>
   );

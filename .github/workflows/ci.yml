@@ -8,6 +8,7 @@ on:
       - 'foundation/**'
       - 'simulation/**'
       - 'network/**'
+      - 'multiplayer/**'
 
 permissions:
   contents: read
