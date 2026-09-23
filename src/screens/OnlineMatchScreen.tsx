@@ -19,6 +19,7 @@ export function OnlineMatchScreen() {
     networkMetrics,
     pendingInputs,
     networkError,
+    disconnectedPlayers,
   } = useConnection();
 
   useEffect(() => {
@@ -205,19 +206,35 @@ export function OnlineMatchScreen() {
 
   if (!match) return null;
 
+  const disconnectedEntries = Object.entries(disconnectedPlayers)
+    .map(([playerId, deadline]) => ({
+      playerId,
+      secondsLeft: Math.max(0, Math.ceil((deadline - Date.now()) / 1000)),
+    }))
+    .sort((a, b) => a.playerId.localeCompare(b.playerId));
+
   return (
     <div className="fixed inset-0 bg-[#07110f] text-[#d8e4e8] overflow-hidden">
       <canvas ref={canvasRef} className="absolute inset-0 cursor-crosshair" />
       <div className="absolute top-3 left-3 z-10 bg-[#09131a]/90 border-2 border-[#28434d] px-3 py-2 font-mono text-xs min-w-64">
         <div className="font-pixel text-[9px] text-[#e8c860] mb-2">FORGED MOBA · AUTHORITATIVE ONLINE</div>
-        <div>{match.mode === 'duel1v1' ? 'DUEL 1V1' : 'RANKED 5V5'} · match {match.matchId.slice(0, 8)}</div>
+        <div>
+          {match.mode === 'duel1v1' ? 'DUEL 1V1' : match.mode === 'skirmish3v3' ? 'SKIRMISH 3V3' : 'RANKED 5V5'}
+          {' · '}match {match.matchId.slice(0, 8)}
+        </div>
         <div>team {match.team} · slot {match.slot}</div>
         <div>tick {authoritativeSnapshot?.serverTick ?? '—'} · {match.serverTickRate} Hz · snapshots ~10 Hz</div>
         <div>RTT {networkMetrics.rttMs === null ? '—' : networkMetrics.rttMs.toFixed(1)} ms · jitter {networkMetrics.jitterMs.toFixed(1)} ms</div>
         <div>correction {networkMetrics.correctionDistance.toFixed(2)} · pending {pendingInputs}</div>
         <div>snapshot interval {networkMetrics.snapshotIntervalMs === null ? '—' : networkMetrics.snapshotIntervalMs.toFixed(1)} ms</div>
+        <div>reconnect grace {Math.round(match.reconnectGraceMs / 1000)}s</div>
         <div className="text-[#71909d] mt-1 break-all">content {match.contentVersion}</div>
         {networkError && <div className="text-[#ff8585] mt-1">network: {networkError}</div>}
+        {disconnectedEntries.map((entry) => (
+          <div key={entry.playerId} className="text-[#ffbf66] mt-1">
+            reconnect {entry.playerId.slice(0, 8)} · {entry.secondsLeft}s
+          </div>
+        ))}
       </div>
 
       <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 bg-[#09131a]/90 border border-[#28434d] px-4 py-2 text-xs">

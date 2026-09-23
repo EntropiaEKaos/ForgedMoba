@@ -478,16 +478,19 @@ function MultiplayerLobby({ onPlay }: { onPlay: () => void }) {
     );
   }
 
-  const queueLabel = queueMode === 'duel1v1' ? 'DUELO 1V1' : 'RANQUEADA 5V5';
+  const queueLabel =
+    queueMode === 'duel1v1' ? 'DUELO 1V1' :
+    queueMode === 'skirmish3v3' ? 'ESCARAMUÇA 3V3' :
+    'RANQUEADA 5V5';
 
   return (
-    <div className="max-w-3xl mx-auto space-y-4">
-      <div className="grid md:grid-cols-2 gap-4">
+    <div className="max-w-5xl mx-auto space-y-4">
+      <div className="grid lg:grid-cols-3 gap-4">
         <div className="pixel-panel bg-[#101820] p-5 text-center border-[#6a4f24]">
           <div className="text-4xl mb-2">⚔️</div>
           <h2 className="font-pixel text-[11px] text-[#e8c860] mb-2">DUELO AUTORITATIVO 1V1</h2>
-          <p className="text-[14px] text-[#9ab0b8] min-h-12">
-            Vertical slice real para validar prediction, reconciliation, Q, lane, torre e vitória com apenas 2 contas.
+          <p className="text-[14px] text-[#9ab0b8] min-h-16">
+            Vertical slice de menor escala para validar prediction, reconciliation, Q, lane, torre e vitória.
           </p>
           <button
             disabled={conn.inQueue}
@@ -498,10 +501,25 @@ function MultiplayerLobby({ onPlay }: { onPlay: () => void }) {
           </button>
         </div>
 
+        <div className="pixel-panel bg-[#101820] p-5 text-center border-[#315875]">
+          <div className="text-4xl mb-2">🛡️</div>
+          <h2 className="font-pixel text-[11px] text-[#8ac8ff] mb-2">ESCARAMUÇA 3V3</h2>
+          <p className="text-[14px] text-[#9ab0b8] min-h-16">
+            Seis jogadores reais, equipes 3v3 e janela autoritativa de reconnect antes de um abandono por desconexão.
+          </p>
+          <button
+            disabled={conn.inQueue}
+            onClick={() => conn.joinQueue('skirmish3v3')}
+            className="mt-4 w-full font-pixel text-[9px] py-3 bg-[#244b66] text-[#cceaff] border-2 border-[#3f7fa8] disabled:opacity-40 hover:bg-[#2e5e7f]"
+          >
+            🛡 ENTRAR NO 3V3
+          </button>
+        </div>
+
         <div className="pixel-panel bg-[#101820] p-5 text-center">
           <div className="text-4xl mb-2">🏰</div>
           <h2 className="font-pixel text-[11px] text-[#5ad0c0] mb-2">RANQUEADA 5V5 — FUNDAÇÃO</h2>
-          <p className="text-[14px] text-[#9ab0b8] min-h-12">
+          <p className="text-[14px] text-[#9ab0b8] min-h-16">
             Preserva a fila de 10 jogadores para a evolução do MOBA completo; ainda usa o slice de lane autoritativo.
           </p>
           <button
@@ -528,7 +546,9 @@ function MultiplayerLobby({ onPlay }: { onPlay: () => void }) {
           </div>
           <div className="text-[14px] text-[#9ab0b8]">
             Posição: <b className="text-[#e8c860]">{conn.queuePos ?? '—'}</b>
-            {' · '}alvo: <b className="text-[#5ad0c0]">{queueRequiredPlayers || (queueMode === 'duel1v1' ? 2 : 10)} jogadores</b>
+            {' · '}alvo: <b className="text-[#5ad0c0]">
+              {queueRequiredPlayers || (queueMode === 'duel1v1' ? 2 : queueMode === 'skirmish3v3' ? 6 : 10)} jogadores
+            </b>
             {conn.queueEta > 0 && <> · ~{conn.queueEta}s estimado</>}
           </div>
           <button
@@ -550,8 +570,10 @@ function MultiplayerLobby({ onPlay }: { onPlay: () => void }) {
           <div className="font-pixel text-[16px] text-[#e8c860]">{conn.serverInfo?.activeMatches ?? 0}</div>
         </div>
         <div className="pixel-panel bg-[#101820] p-4 text-center">
-          <div className="font-pixel text-[8px] text-[#5ad0c0] mb-1">CONTA</div>
-          <div className="font-pixel text-[10px] text-[#e8c860] mt-1.5">{conn.user?.mode === 'account' ? 'LOGADO' : 'CONVIDADO'}</div>
+          <div className="font-pixel text-[8px] text-[#5ad0c0] mb-1">RECONNECT</div>
+          <div className="font-pixel text-[10px] text-[#8ac8ff] mt-1.5">
+            {Math.round((conn.serverInfo?.reconnectGraceMs ?? 30000) / 1000)}s GRACE
+          </div>
         </div>
       </div>
 

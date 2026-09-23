@@ -1,6 +1,6 @@
 export type PlayerId = string;
 export type EntityId = number;
-export type MatchMode = 'duel1v1' | 'ranked5v5';
+export type MatchMode = 'duel1v1' | 'skirmish3v3' | 'ranked5v5';
 
 export interface CommandBase {
   playerId: PlayerId;
@@ -65,6 +65,7 @@ export interface MatchFoundPayload {
   playerId: PlayerId;
   contentVersion: string;
   serverTickRate: number;
+  reconnectGraceMs: number;
 }
 
 export interface InputEnvelope {

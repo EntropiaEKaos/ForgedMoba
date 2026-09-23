@@ -15,12 +15,14 @@ export interface MatchmakingJoinResult {
 
 const REQUIRED: Record<MatchMode, number> = {
   duel1v1: 2,
+  skirmish3v3: 6,
   ranked5v5: 10,
 };
 
 export class MatchmakingQueues {
   private readonly queues: Record<MatchMode, MatchmakingEntry[]> = {
     duel1v1: [],
+    skirmish3v3: [],
     ranked5v5: [],
   };
 
@@ -46,7 +48,7 @@ export class MatchmakingQueues {
 
   leaveBySocket(socketId: string): boolean {
     let removed = false;
-    for (const mode of ['duel1v1', 'ranked5v5'] as const) {
+    for (const mode of ['duel1v1', 'skirmish3v3', 'ranked5v5'] as const) {
       const queue = this.queues[mode];
       const index = queue.findIndex((entry) => entry.socketId === socketId);
       if (index >= 0) {
@@ -73,7 +75,7 @@ export class MatchmakingQueues {
   }
 
   private findByUser(userId: string): { mode: MatchMode; position: number } | null {
-    for (const mode of ['duel1v1', 'ranked5v5'] as const) {
+    for (const mode of ['duel1v1', 'skirmish3v3', 'ranked5v5'] as const) {
       const position = this.queues[mode].findIndex((entry) => entry.userId === userId);
       if (position >= 0) return { mode, position: position + 1 };
     }
@@ -81,7 +83,7 @@ export class MatchmakingQueues {
   }
 
   private findBySocket(socketId: string): { mode: MatchMode; position: number } | null {
-    for (const mode of ['duel1v1', 'ranked5v5'] as const) {
+    for (const mode of ['duel1v1', 'skirmish3v3', 'ranked5v5'] as const) {
       const position = this.queues[mode].findIndex((entry) => entry.socketId === socketId);
       if (position >= 0) return { mode, position: position + 1 };
     }

@@ -171,9 +171,13 @@ export class MatchRunner {
   }
 
   forfeit(playerId: PlayerId): boolean {
-    if (this.completed) return false;
     const team = this.playerTeams.get(playerId);
     if (team === undefined) return false;
+    return this.forfeitTeam(team);
+  }
+
+  forfeitTeam(team: 0 | 1): boolean {
+    if (this.completed) return false;
     this.state.winner = team === 0 ? 1 : 0;
     this.finish();
     return true;
