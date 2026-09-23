@@ -30,11 +30,22 @@ export function createClientViewState(
 
   const ownAck = state.lastAcceptedSeq[playerId] ?? -1;
   return {
-    ...structuredClone(state),
+    version: state.version,
+    contentVersion: state.contentVersion,
+    tick: state.tick,
     seed: 0,
     rngState: 0,
+    width: state.width,
+    height: state.height,
     nextEntityId: 1_000_000_000 + state.tick * 100,
     entities,
+    score: [...state.score] as [number, number],
+    objectiveScore: [...state.objectiveScore] as [number, number],
     lastAcceptedSeq: { [playerId]: ownAck },
+    laneEnabled: state.laneEnabled,
+    jungleEnabled: state.jungleEnabled,
+    nextWaveTick: state.nextWaveTick,
+    waveNumber: state.waveNumber,
+    winner: state.winner,
   };
 }
