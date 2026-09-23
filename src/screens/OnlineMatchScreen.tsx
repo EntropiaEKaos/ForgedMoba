@@ -2,10 +2,6 @@ import { useEffect, useRef } from 'react';
 import { conn, useConnection } from '../network/connection';
 import type { SimEntity, SimulationState } from '../simulation/types';
 
-interface OnlineMatchScreenProps {
-  onExit: () => void;
-}
-
 function localEntity(state: SimulationState | null, playerId: string | undefined): SimEntity | null {
   if (!state || !playerId) return null;
   return Object.values(state.entities)
@@ -13,7 +9,7 @@ function localEntity(state: SimulationState | null, playerId: string | undefined
     .sort((a, b) => a.id - b.id)[0] ?? null;
 }
 
-export function OnlineMatchScreen({ onExit }: OnlineMatchScreenProps) {
+export function OnlineMatchScreen() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const {
     match,
@@ -44,8 +40,8 @@ export function OnlineMatchScreen({ onExit }: OnlineMatchScreenProps) {
     };
 
     const screenToWorld = (clientX: number, clientY: number) => {
-      const width = authoritativeSnapshot?.state.width ?? 3000;
-      const height = authoritativeSnapshot?.state.height ?? 3000;
+      const width = conn.authoritativeSnapshot?.state.width ?? 3000;
+      const height = conn.authoritativeSnapshot?.state.height ?? 3000;
       return {
         x: Math.max(0, Math.min(width, clientX / window.innerWidth * width)),
         y: Math.max(0, Math.min(height, clientY / window.innerHeight * height)),
@@ -53,7 +49,7 @@ export function OnlineMatchScreen({ onExit }: OnlineMatchScreenProps) {
     };
 
     const nearestEnemyId = (worldX: number, worldY: number): number | null => {
-      const state = predictedState ?? authoritativeSnapshot?.state;
+      const state = conn.predictedState ?? conn.authoritativeSnapshot?.state;
       if (!state) return null;
       const local = localEntity(state, user?.id);
       if (!local) return null;
@@ -90,7 +86,7 @@ export function OnlineMatchScreen({ onExit }: OnlineMatchScreenProps) {
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 's' || event.key === 'S') conn.sendStop();
       if (event.key === 'q' || event.key === 'Q') {
-        const state = predictedState ?? authoritativeSnapshot?.state;
+        const state = conn.predictedState ?? conn.authoritativeSnapshot?.state;
         const local = localEntity(state ?? null, user?.id);
         if (!local) return;
         if (local.heroId === 'gareth') {
@@ -102,7 +98,6 @@ export function OnlineMatchScreen({ onExit }: OnlineMatchScreenProps) {
       }
       if (event.key === 'Escape') {
         conn.clearMatch();
-        onExit();
       }
     };
 
@@ -114,7 +109,7 @@ export function OnlineMatchScreen({ onExit }: OnlineMatchScreenProps) {
     };
 
     const frame = () => {
-      const state = predictedState ?? authoritativeSnapshot?.state ?? null;
+      const state = conn.predictedState ?? conn.authoritativeSnapshot?.state ?? null;
       const interpolated = conn.getInterpolatedFrame();
       const width = state?.width ?? 3000;
       const height = state?.height ?? 3000;
@@ -201,7 +196,7 @@ export function OnlineMatchScreen({ onExit }: OnlineMatchScreenProps) {
       canvas.removeEventListener('click', onClick);
       window.removeEventListener('keydown', onKey);
     };
-  }, [match?.matchId, user?.id, authoritativeSnapshot, predictedState, onExit]);
+  }, [match?.matchId, user?.id]);
 
   if (!match) return null;
 
@@ -224,7 +219,7 @@ export function OnlineMatchScreen({ onExit }: OnlineMatchScreenProps) {
       </div>
 
       <button
-        onClick={() => { conn.clearMatch(); onExit(); }}
+        onClick={() => conn.clearMatch()}
         className="absolute top-3 right-3 z-10 bg-[#3b1717] border-2 border-[#7f3737] px-3 py-2 font-pixel text-[8px] text-[#ffb0a0]"
       >
         SAIR DO SLICE
