@@ -69,6 +69,7 @@ export interface AuthoritativeRulesContent {
   wardDurationTicks: number;
   wardCooldownTicks: number;
   wardVisionRadius: number;
+  heroVisionRadius: number;
   maxWardsPerTeam: number;
 }
 
@@ -114,6 +115,7 @@ export function validateAuthoritativeContent(payload: AuthoritativeContentPayloa
   assertInt('rules.wardDurationTicks', payload.rules.wardDurationTicks, 1, 1_000_000);
   assertInt('rules.wardCooldownTicks', payload.rules.wardCooldownTicks, 1, 1_000_000);
   assertInt('rules.wardVisionRadius', payload.rules.wardVisionRadius, 1, 100_000);
+  assertInt('rules.heroVisionRadius', payload.rules.heroVisionRadius, 1, 100_000);
   assertInt('rules.maxWardsPerTeam', payload.rules.maxWardsPerTeam, 1, 20);
 
   assertUniqueIds('heroes', payload.heroes);
@@ -214,6 +216,7 @@ export const CURRENT_AUTHORITATIVE_CONTENT = publishAuthoritativeContent('author
     wardDurationTicks: 2700,
     wardCooldownTicks: 900,
     wardVisionRadius: 500,
+    heroVisionRadius: 520,
     maxWardsPerTeam: 4,
   },
   heroes: [
@@ -302,7 +305,7 @@ export const CURRENT_AUTHORITATIVE_CONTENT = publishAuthoritativeContent('author
       id: 'rift-sentinel',
       kind: 'objective',
       xPermille: 500,
-      yPermille: 500,
+      yPermille: 180,
       maxHp: 2400,
       attackDamage: 72,
       attackRange: 78,
