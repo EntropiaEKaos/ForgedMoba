@@ -63,7 +63,7 @@ test('stable match ID seed is deterministic', () => {
 
 
 test('1v1 forfeit is server authoritative and completes with the opponent winner', () => {
-  let completed: SimulationState | null = null;
+  let completedWinner: 0 | 1 | null = null;
   const runner = new MatchRunner({
     matchId: 'duel-forfeit',
     contentVersion: 'core-0.3+test',
@@ -72,11 +72,11 @@ test('1v1 forfeit is server authoritative and completes with the opponent winner
       { playerId: 'blue-1', team: 0, slot: 0 },
       { playerId: 'red-1', team: 1, slot: 0 },
     ],
-    onComplete: (state) => { completed = structuredClone(state); },
+    onComplete: (state) => { completedWinner = state.winner; },
   });
   assert.equal(runner.forfeit('blue-1'), true);
   assert.equal(runner.state.winner, 1);
-  assert.equal(completed?.winner, 1);
+  assert.equal(completedWinner, 1);
   assert.equal(runner.forfeit('blue-1'), false);
   assert.equal(runner.forfeit('missing'), false);
 });
