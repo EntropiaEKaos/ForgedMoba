@@ -60,3 +60,23 @@ test('stable match ID seed is deterministic', () => {
   assert.equal(stableSeedFromMatchId('abc'), stableSeedFromMatchId('abc'));
   assert.notEqual(stableSeedFromMatchId('abc'), stableSeedFromMatchId('abd'));
 });
+
+
+test('1v1 forfeit is server authoritative and completes with the opponent winner', () => {
+  let completed: SimulationState | null = null;
+  const runner = new MatchRunner({
+    matchId: 'duel-forfeit',
+    contentVersion: 'core-0.3+test',
+    seed: stableSeedFromMatchId('duel-forfeit'),
+    players: [
+      { playerId: 'blue-1', team: 0, slot: 0 },
+      { playerId: 'red-1', team: 1, slot: 0 },
+    ],
+    onComplete: (state) => { completed = structuredClone(state); },
+  });
+  assert.equal(runner.forfeit('blue-1'), true);
+  assert.equal(runner.state.winner, 1);
+  assert.equal(completed?.winner, 1);
+  assert.equal(runner.forfeit('blue-1'), false);
+  assert.equal(runner.forfeit('missing'), false);
+});
