@@ -35,7 +35,8 @@ export function runFiveVFiveLoadProbe(
   const ticks = Math.max(1, Math.trunc(options.ticks ?? 600));
   const commandEveryTicks = Math.max(1, Math.trunc(options.commandEveryTicks ?? 15));
 
-  const runners = Array.from({ length: matches }, (_, index) => {
+  const rosters = Array.from({ length: matches }, (_, index) => playersFor(index));
+  const runners = rosters.map((players, index) => {
     const matchId = 'load-probe-' + index;
     return new MatchRunner({
       matchId,
@@ -43,7 +44,7 @@ export function runFiveVFiveLoadProbe(
       content: CURRENT_AUTHORITATIVE_CONTENT,
       seed: stableSeedFromMatchId(matchId),
       snapshotEveryTicks: 10_000_000,
-      players: playersFor(index),
+      players,
     });
   });
 
@@ -56,7 +57,7 @@ export function runFiveVFiveLoadProbe(
       const runner = runners[matchIndex];
       if (tick % commandEveryTicks === 0) {
         for (let playerIndex = 0; playerIndex < 10; playerIndex += 1) {
-          const player = playersFor(matchIndex)[playerIndex];
+          const player = rosters[matchIndex][playerIndex];
           const seq = ++sequences[matchIndex][playerIndex];
           const direction = player.team === 0 ? 1 : -1;
           const result = runner.enqueue(player.playerId, {
