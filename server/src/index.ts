@@ -23,12 +23,21 @@ import { RankedDraftRoom } from './rankedDraft.ts';
 import { EventRateLimiter, type EventRatePolicy } from './eventRateLimiter.ts';
 import { MetricsRegistry } from './metrics.ts';
 import { createMatchArchiveStore } from './matchArchive.ts';
+import {
+  createIdentityStore,
+  type IdentityUser,
+} from './identityStore.ts';
 
 const PORT = Number(process.env.PORT || 3001);
 const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:5173';
 const SERVER_VERSION = '3.0.0-rc.1';
 const RECONNECT_GRACE_MS = 30_000;
 const RANKED_DRAFT_TIMEOUT_MS = 120_000;
+const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const IDENTITY_STORE_FILE = process.env.IDENTITY_STORE_FILE?.trim() || null;
+if (process.env.NODE_ENV === 'production' && !IDENTITY_STORE_FILE) {
+  throw new Error('IDENTITY_STORE_FILE é obrigatório em produção.');
+}
 const CONTENT_VERSION = CURRENT_AUTHORITATIVE_CONTENT.contentVersion;
 if (CURRENT_AUTHORITATIVE_CONTENT.payload.rules.tickRate !== SIM_TICK_RATE) {
   throw new Error('Published content tickRate does not match simulation tickRate.');
@@ -42,14 +51,6 @@ function resolveJwtSecret(): string {
 }
 const JWT_SECRET = resolveJwtSecret();
 
-interface DbUser {
-  id: string;
-  username: string;
-  email: string;
-  passwordHash: string;
-  passwordSalt: string;
-  level: number;
-}
 interface QueueEntry extends MatchmakingEntry {}
 interface MatchPlayer extends QueueEntry {
   team: 0 | 1;
@@ -71,9 +72,7 @@ interface AuthedSocketData {
 }
 interface GameInputPayload { matchId?: unknown; command?: unknown; }
 
-const users = new Map<string, DbUser>();
-const usersByName = new Map<string, string>();
-const usersByEmail = new Map<string, string>();
+const identityStore = await createIdentityStore(IDENTITY_STORE_FILE ?? undefined);
 const matchmaking = new MatchmakingQueues();
 const activeMatches = new Map<string, ActiveMatch>();
 const draftRooms = new Map<string, RankedDraftRoom>();
@@ -133,13 +132,31 @@ function isValidPassword(value: unknown): value is string {
 function hashPassword(password: string, salt = randomBytes(16).toString('hex')): { hash: string; salt: string } {
   return { hash: scryptSync(password, salt, 64).toString('hex'), salt };
 }
-function verifyPassword(password: string, user: DbUser): boolean {
+function verifyPassword(password: string, user: IdentityUser): boolean {
   const actual = Buffer.from(scryptSync(password, user.passwordSalt, 64));
   const expected = Buffer.from(user.passwordHash, 'hex');
   return actual.length === expected.length && timingSafeEqual(actual, expected);
 }
-function sign(user: DbUser): string {
-  return jwt.sign({ userId: user.id, username: user.username }, JWT_SECRET, { expiresIn: '7d' });
+function sign(user: IdentityUser, sessionId: string): string {
+  return jwt.sign(
+    { userId: user.id, username: user.username, sessionId },
+    JWT_SECRET,
+    { expiresIn: Math.trunc(SESSION_TTL_MS / 1000), jwtid: sessionId },
+  );
+}
+
+async function createSessionToken(user: IdentityUser): Promise<string> {
+  const now = Date.now();
+  const sessionId = randomUUID();
+  await identityStore.createSession({
+    id: sessionId,
+    userId: user.id,
+    createdAt: now,
+    expiresAt: now + SESSION_TTL_MS,
+    revokedAt: null,
+  });
+  metrics.inc('forged_sessions_created_total');
+  return sign(user, sessionId);
 }
 function removeSocketFromQueue(socketId: string): void {
   matchmaking.leaveBySocket(socketId);
@@ -396,6 +413,7 @@ app.get('/api/health', (_req, res) => {
     activeDrafts: draftRooms.size,
     activeMatches: activeMatches.size,
     replayArchive: process.env.MATCH_ARCHIVE_DIR?.trim() ? 'file' : 'memory',
+    identityStore: identityStore.kind,
   });
 });
 
@@ -422,55 +440,98 @@ const draftSweep = setInterval(() => {
 }, 1_000);
 draftSweep.unref();
 
-app.post('/api/auth/register', authRateLimit, (req, res) => {
-  const { username, email, password } = req.body as Record<string, unknown>;
-  if (!isValidUsername(username)) return res.status(400).json({ error: 'Usuário deve ter 3-24 caracteres alfanuméricos/_.' });
-  if (!isValidEmail(email)) return res.status(400).json({ error: 'E-mail inválido.' });
-  if (!isValidPassword(password)) return res.status(400).json({ error: 'Senha deve ter 8-128 caracteres.' });
-  const nameKey = normalizeIdentity(username);
-  const emailKey = normalizeIdentity(email);
-  if (usersByName.has(nameKey)) return res.status(409).json({ error: 'Usuário já existe.' });
-  if (usersByEmail.has(emailKey)) return res.status(409).json({ error: 'E-mail já cadastrado.' });
-  const id = randomUUID();
-  const secured = hashPassword(password);
-  const user: DbUser = {
-    id,
-    username: username.trim(),
-    email: email.trim(),
-    passwordHash: secured.hash,
-    passwordSalt: secured.salt,
-    level: 1,
-  };
-  users.set(id, user);
-  usersByName.set(nameKey, id);
-  usersByEmail.set(emailKey, id);
-  return res.status(201).json({
-    user: { id, username: user.username, email: user.email, level: user.level },
-    token: sign(user),
-  });
+app.post('/api/auth/register', authRateLimit, async (req, res) => {
+  try {
+    const { username, email, password } = req.body as Record<string, unknown>;
+    if (!isValidUsername(username)) {
+      return res.status(400).json({ error: 'Usuário deve ter 3-24 caracteres alfanuméricos/_.' });
+    }
+    if (!isValidEmail(email)) return res.status(400).json({ error: 'E-mail inválido.' });
+    if (!isValidPassword(password)) return res.status(400).json({ error: 'Senha deve ter 8-128 caracteres.' });
+
+    if (await identityStore.findUserByUsername(username)) {
+      return res.status(409).json({ error: 'Usuário já existe.' });
+    }
+    if (await identityStore.findUserByEmail(email)) {
+      return res.status(409).json({ error: 'E-mail já cadastrado.' });
+    }
+
+    const id = randomUUID();
+    const secured = hashPassword(password);
+    const user: IdentityUser = {
+      id,
+      username: username.trim(),
+      email: email.trim(),
+      passwordHash: secured.hash,
+      passwordSalt: secured.salt,
+      level: 1,
+    };
+    await identityStore.createUser(user);
+    const token = await createSessionToken(user);
+    metrics.inc('forged_auth_success_total', { action: 'register' });
+    return res.status(201).json({
+      user: { id, username: user.username, email: user.email, level: user.level },
+      token,
+    });
+  } catch (error) {
+    metrics.inc('forged_auth_failures_total', { action: 'register', code: 'internal' });
+    console.error('[auth] register failure', error);
+    return res.status(500).json({ error: 'Falha interna ao criar conta.' });
+  }
 });
 
-app.post('/api/auth/login', authRateLimit, (req, res) => {
-  const { username, password } = req.body as Record<string, unknown>;
-  if (typeof username !== 'string' || typeof password !== 'string') return res.status(400).json({ error: 'Credenciais inválidas.' });
-  const id = usersByName.get(normalizeIdentity(username));
-  const user = id ? users.get(id) : undefined;
-  if (!user || !verifyPassword(password, user)) return res.status(401).json({ error: 'Usuário ou senha incorretos.' });
-  return res.json({
-    user: { id: user.id, username: user.username, email: user.email, level: user.level },
-    token: sign(user),
-  });
+app.post('/api/auth/login', authRateLimit, async (req, res) => {
+  try {
+    const { username, password } = req.body as Record<string, unknown>;
+    if (typeof username !== 'string' || typeof password !== 'string') {
+      return res.status(400).json({ error: 'Credenciais inválidas.' });
+    }
+    const user = await identityStore.findUserByUsername(username);
+    if (!user || !verifyPassword(password, user)) {
+      metrics.inc('forged_auth_failures_total', { action: 'login', code: 'invalid-credentials' });
+      return res.status(401).json({ error: 'Usuário ou senha incorretos.' });
+    }
+    const token = await createSessionToken(user);
+    metrics.inc('forged_auth_success_total', { action: 'login' });
+    return res.json({
+      user: { id: user.id, username: user.username, email: user.email, level: user.level },
+      token,
+    });
+  } catch (error) {
+    metrics.inc('forged_auth_failures_total', { action: 'login', code: 'internal' });
+    console.error('[auth] login failure', error);
+    return res.status(500).json({ error: 'Falha interna no login.' });
+  }
 });
 
-io.use((socket, next) => {
+app.post('/api/auth/logout', async (req, res) => {
+  const authorization = req.get('authorization');
+  const token = authorization?.startsWith('Bearer ') ? authorization.slice(7) : null;
+  if (!token) return res.status(401).json({ error: 'unauthorized' });
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload & { sessionId?: string };
+    if (typeof decoded.sessionId !== 'string') return res.status(401).json({ error: 'unauthorized' });
+    await identityStore.revokeSession(decoded.sessionId);
+    metrics.inc('forged_sessions_revoked_total', { reason: 'logout' });
+    return res.status(204).end();
+  } catch {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+});
+
+io.use(async (socket, next) => {
   try {
     const token = socket.handshake.auth?.token;
     const clientContentVersion = socket.handshake.auth?.contentVersion;
     if (typeof token !== 'string' || token.length === 0) return next(new Error('unauthorized'));
     if (clientContentVersion !== CONTENT_VERSION) return next(new Error('content-version-mismatch'));
-    const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload & { userId?: string };
-    if (typeof decoded.userId !== 'string') return next(new Error('unauthorized'));
-    const user = users.get(decoded.userId);
+    const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload & { userId?: string; sessionId?: string };
+    if (typeof decoded.userId !== 'string' || typeof decoded.sessionId !== 'string') {
+      return next(new Error('unauthorized'));
+    }
+    const session = await identityStore.getActiveSession(decoded.sessionId);
+    if (!session || session.userId !== decoded.userId) return next(new Error('session-revoked'));
+    const user = await identityStore.findUserById(decoded.userId);
     if (!user) return next(new Error('unauthorized'));
     socket.data = { userId: user.id, username: user.username } satisfies AuthedSocketData;
     next();
@@ -705,5 +766,6 @@ httpServer.listen(PORT, () => {
   console.log('\n  ForgedMoba Server ' + SERVER_VERSION + ' em http://localhost:' + PORT);
   console.log('  Conteúdo: ' + CONTENT_VERSION + ' | simulação: ' + SIM_TICK_RATE + 'Hz');
   console.log('  CORS: ' + CORS_ORIGIN);
-  console.log('  Persistência: memória (ambiente de desenvolvimento)\n');
+  console.log('  Identity store: ' + identityStore.kind + ' | replay archive: ' +
+    (process.env.MATCH_ARCHIVE_DIR?.trim() ? 'file' : 'memory') + '\n');
 });
