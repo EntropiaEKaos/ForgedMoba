@@ -69,7 +69,7 @@ The existing game is a feature-rich offline prototype. The migration strategy is
 - [x] branch CI + PR CI + post-merge main CI green on main @ ca0dbcc6b2c64156852ec0bb29909b77fa6c9217.
 - [ ] follow-up security/dependency audit for the npm vulnerabilities surfaced by CI; no forced upgrade will be merged without compatibility verification.
 
-## Multiplayer 0.5 — current branch
+## Multiplayer 0.5 — certified and merged
 
 - [x] explicit `duel1v1` and `ranked5v5` protocol modes.
 - [x] isolated/tested matchmaking queues with exact readiness thresholds (2 / 10).
@@ -80,11 +80,24 @@ The existing game is a feature-rich offline prototype. The migration strategy is
 - [x] game-complete result screen before returning to lobby.
 - [x] reconnect replaces the previous controlling socket instead of creating dual control.
 - [x] match room membership and identity are cleaned on completion.
+- [x] branch CI + PR CI + post-merge main CI green on main @ e80131633d162f2ba6daae67c11344f723aee4c3.
+
+## Multiplayer 0.6 — current branch
+
+- [x] explicit `skirmish3v3` protocol mode.
+- [x] isolated six-player matchmaking queue with exact 3v3 readiness.
+- [x] 30-second server-owned reconnect grace registry.
+- [x] reconnect cancels the disconnect lease and restores the same match slot.
+- [x] reconnect expiry triggers authoritative team forfeit.
+- [x] stale/replaced sockets cannot create a second controlling session.
+- [x] client HUD exposes reconnect grace and disconnected-player countdown.
+- [x] Duel 1v1 and Ranked 5v5 remain available alongside 3v3.
+- [x] unit tests cover reconnect expiry/cancel/cleanup and exact 3v3 matchmaking.
 - [ ] branch CI + PR CI + post-merge main CI certification.
 
 ## Multiplayer milestones
 
-- [ ] 0.6: 3v3 reliability + reconnect.
+- [ ] 0.7: abilities/items/content publishing bound to content hash.
 - [ ] 0.7: abilities/items/content publishing bound to content hash.
 - [ ] 0.8: jungle/objectives/wards under server authority.
 - [ ] 0.9: full draft/lobby and 5v5 load testing.
