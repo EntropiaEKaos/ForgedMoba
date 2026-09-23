@@ -65,6 +65,17 @@ function normalizeCoreCommand(playerId: PlayerId, raw: PlayerCommand): CoreSimul
     if (typeof raw.itemId !== 'string' || raw.itemId.length === 0 || raw.itemId.length > 64) return null;
     return { type: 'buy', playerId, seq, tick, itemId: raw.itemId };
   }
+  if (raw.type === 'place-ward') {
+    if (!Number.isFinite(raw.x) || !Number.isFinite(raw.y)) return null;
+    return {
+      type: 'place-ward',
+      playerId,
+      seq,
+      tick,
+      x: Math.trunc(raw.x),
+      y: Math.trunc(raw.y),
+    };
+  }
   if (raw.type === 'cast') {
     if (raw.slot !== 'Q') return null;
     let targetId: number | undefined;
@@ -144,6 +155,7 @@ export class MatchRunner {
       seed: options.seed,
       contentVersion: options.contentVersion,
       withLane: true,
+      withJungle: true,
       players: options.players.map((player) => ({
         playerId: player.playerId,
         team: player.team,
@@ -170,7 +182,7 @@ export class MatchRunner {
 
   enqueue(playerId: PlayerId, command: PlayerCommand): MatchInputResult {
     if (!this.playerIds.has(playerId)) return { ok: false, code: 'unknown-player' };
-    if (!['move', 'attack', 'stop', 'cast', 'buy'].includes(command.type)) return { ok: false, code: 'unsupported-command' };
+    if (!['move', 'attack', 'stop', 'cast', 'buy', 'place-ward'].includes(command.type)) return { ok: false, code: 'unsupported-command' };
     if (command.type === 'cast' && command.slot !== 'Q') return { ok: false, code: 'unsupported-command' };
     const normalized = normalizeCoreCommand(playerId, command);
     if (!normalized) return { ok: false, code: 'invalid-command' };
