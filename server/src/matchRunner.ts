@@ -9,6 +9,12 @@ import {
   type AuthoritativeHeroId,
   type PublishedAuthoritativeContent,
 } from '../../src/shared/authoritativeContent.ts';
+import type {
+  MatchReplayFrame,
+  MatchReplayPlayer,
+  MatchReplayRecord,
+  MatchReplayTerminal,
+} from './replay.ts';
 import {
   SIM_TICK_RATE,
   createSimulation,
@@ -42,7 +48,7 @@ export interface MatchRunnerOptions {
   snapshotEveryTicks?: number;
   content?: PublishedAuthoritativeContent;
   onSnapshot?: (snapshot: AuthoritativeSnapshot<SimulationState>) => void;
-  onComplete?: (state: SimulationState) => void;
+  onComplete?: (state: SimulationState, replay: MatchReplayRecord) => void;
 }
 
 function finiteInt(value: unknown): number | null {
@@ -129,6 +135,10 @@ export class MatchRunner {
   readonly snapshotEveryTicks: number;
 
   private readonly content: PublishedAuthoritativeContent;
+  private readonly seed: number;
+  private readonly replayPlayers: MatchReplayPlayer[];
+  private readonly appliedFrames: MatchReplayFrame[] = [];
+  private terminal: MatchReplayTerminal | null = null;
   private readonly playerIds: Set<PlayerId>;
   private readonly playerTeams = new Map<PlayerId, 0 | 1>();
   private readonly queued = new Map<number, CoreSimulationCommand[]>();
@@ -140,6 +150,7 @@ export class MatchRunner {
 
   constructor(options: MatchRunnerOptions) {
     this.matchId = options.matchId;
+    this.seed = options.seed;
     this.content = options.content ?? CURRENT_AUTHORITATIVE_CONTENT;
     this.contentVersion = options.contentVersion;
     if (this.contentVersion !== this.content.contentVersion) {
@@ -154,7 +165,7 @@ export class MatchRunner {
     this.onSnapshot = options.onSnapshot;
     this.onComplete = options.onComplete;
     this.state = createSimulation({
-      seed: options.seed,
+      seed: this.seed,
       contentVersion: options.contentVersion,
       withLane: true,
       withJungle: true,
@@ -165,6 +176,19 @@ export class MatchRunner {
         ...spawnFor(player.team, player.slot),
       })),
     }, this.content.payload);
+    this.replayPlayers = options.players.map((player) => {
+      const hero = Object.values(this.state.entities)
+        .find((entity) => entity.ownerPlayerId === player.playerId);
+      if (!hero) throw new Error('missing initial hero for replay: ' + player.playerId);
+      return {
+        playerId: player.playerId,
+        team: player.team,
+        slot: player.slot,
+        heroId: player.heroId,
+        x: hero.spawnX,
+        y: hero.spawnY,
+      };
+    });
     for (const player of options.players) this.lastQueuedSeq.set(player.playerId, -1);
   }
 
@@ -210,6 +234,7 @@ export class MatchRunner {
 
   forfeitTeam(team: 0 | 1): boolean {
     if (this.completed) return false;
+    this.terminal = { type: 'forfeit-team', team, tick: this.state.tick };
     this.state.winner = team === 0 ? 1 : 0;
     this.finish();
     return true;
@@ -220,6 +245,12 @@ export class MatchRunner {
     const tick = this.state.tick;
     const commands = this.queued.get(tick) ?? [];
     this.queued.delete(tick);
+    if (commands.length > 0) {
+      this.appliedFrames.push({
+        tick,
+        commands: structuredClone(commands),
+      });
+    }
     stepSimulation(this.state, commands, this.content.payload);
 
     if (this.state.winner !== null) {
@@ -227,6 +258,21 @@ export class MatchRunner {
       return;
     }
     if (this.state.tick % this.snapshotEveryTicks === 0) this.emitSnapshot();
+  }
+
+  exportReplay(): MatchReplayRecord {
+    return {
+      schemaVersion: 1,
+      matchId: this.matchId,
+      contentVersion: this.contentVersion,
+      seed: this.seed,
+      players: structuredClone(this.replayPlayers),
+      frames: structuredClone(this.appliedFrames),
+      finalTick: this.state.tick,
+      winner: this.state.winner,
+      finalHash: hashSimulationState(this.state),
+      terminal: this.terminal ? { ...this.terminal } : null,
+    };
   }
 
   snapshot(): AuthoritativeSnapshot<SimulationState> {
@@ -245,7 +291,7 @@ export class MatchRunner {
     this.completed = true;
     this.stop();
     this.emitSnapshot();
-    this.onComplete?.(this.state);
+    this.onComplete?.(this.state, this.exportReplay());
   }
 
   private emitSnapshot(): void {
