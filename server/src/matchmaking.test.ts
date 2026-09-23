@@ -34,3 +34,12 @@ test('disconnect cleanup removes socket from its queue', () => {
   assert.equal(queues.size('ranked5v5'), 0);
   assert.equal(queues.leaveBySocket('missing'), false);
 });
+
+
+test('same account cannot occupy multiple queue slots through different sockets', () => {
+  const queues = new MatchmakingQueues();
+  queues.join({ userId: 'same-user', username: 'A', socketId: 'tab-1' }, 'duel1v1');
+  const duplicate = queues.join({ userId: 'same-user', username: 'A', socketId: 'tab-2' }, 'duel1v1');
+  assert.equal(duplicate.joined, false);
+  assert.equal(queues.size('duel1v1'), 1);
+});
