@@ -1,5 +1,6 @@
 export type PlayerId = string;
 export type EntityId = number;
+export type MatchMode = 'duel1v1' | 'ranked5v5';
 
 export interface CommandBase {
   playerId: PlayerId;
@@ -58,6 +59,7 @@ export type CoreSimulationCommand = CoreMovementCommand | CastCommand;
 
 export interface MatchFoundPayload {
   matchId: string;
+  mode: MatchMode;
   team: 0 | 1;
   slot: number;
   playerId: PlayerId;
