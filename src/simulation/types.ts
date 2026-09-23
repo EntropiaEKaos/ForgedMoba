@@ -54,6 +54,7 @@ export interface SimEntity {
   level: number;
   xp: number;
   gold: number;
+  inventory: string[];
   cs: number;
 }
 
