@@ -1,4 +1,4 @@
-import type { SimulationState } from './state';
+import type { SimulationState } from './state.js';
 
 function stableEntity(state: SimulationState, id: number) {
   const e = state.entities[id];
