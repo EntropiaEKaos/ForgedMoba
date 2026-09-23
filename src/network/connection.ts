@@ -440,6 +440,14 @@ class ConnectionManager {
     this.emit();
   }
 
+  leaveMatch() {
+    if (!this.socket || !this.match) {
+      this.clearMatch();
+      return;
+    }
+    this.socket.emit('game:leave', { matchId: this.match.matchId });
+  }
+
   clearMatch() {
     this.match = null;
     this.matchResult = null;
