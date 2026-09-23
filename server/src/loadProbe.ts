@@ -2,6 +2,7 @@ import { performance } from 'node:perf_hooks';
 import { CURRENT_AUTHORITATIVE_CONTENT, type AuthoritativeHeroId } from '../../src/shared/authoritativeContent.ts';
 import { hashSimulationState } from '../../src/simulation/index.ts';
 import { MatchRunner, stableSeedFromMatchId } from './matchRunner.ts';
+import { createPlayerSnapshot } from './snapshotView.ts';
 
 export interface FiveVFiveLoadProbeOptions {
   matches?: number;
@@ -15,6 +16,7 @@ export interface FiveVFiveLoadProbeResult {
   simulatedTicks: number;
   commandsEnqueued: number;
   snapshotsEmitted: number;
+  playerViewsProjected: number;
   elapsedMs: number;
   ticksPerSecond: number;
   finalHashes: string[];
@@ -38,6 +40,7 @@ export function runFiveVFiveLoadProbe(
 
   const rosters = Array.from({ length: matches }, (_, index) => playersFor(index));
   let snapshotsEmitted = 0;
+  let playerViewsProjected = 0;
   const runners = rosters.map((players, index) => {
     const matchId = 'load-probe-' + index;
     return new MatchRunner({
@@ -47,9 +50,24 @@ export function runFiveVFiveLoadProbe(
       seed: stableSeedFromMatchId(matchId),
       snapshotEveryTicks: 3,
       players,
-      onSnapshot: () => { snapshotsEmitted += 1; },
+      onSnapshot: (snapshot) => {
+        snapshotsEmitted += 1;
+        for (const player of players) {
+          createPlayerSnapshot(snapshot, player.playerId);
+          playerViewsProjected += 1;
+        }
+      },
     });
   });
+
+  for (let matchIndex = 0; matchIndex < runners.length; matchIndex += 1) {
+    const initial = runners[matchIndex].snapshot();
+    snapshotsEmitted += 1;
+    for (const player of rosters[matchIndex]) {
+      createPlayerSnapshot(initial, player.playerId);
+      playerViewsProjected += 1;
+    }
+  }
 
   const sequences = Array.from({ length: matches }, () => Array.from({ length: 10 }, () => 0));
   let commandsEnqueued = 0;
@@ -86,6 +104,7 @@ export function runFiveVFiveLoadProbe(
     simulatedTicks,
     commandsEnqueued,
     snapshotsEmitted,
+    playerViewsProjected,
     elapsedMs,
     ticksPerSecond: simulatedTicks / (elapsedMs / 1000),
     finalHashes: runners.map((runner) => hashSimulationState(runner.state)),
