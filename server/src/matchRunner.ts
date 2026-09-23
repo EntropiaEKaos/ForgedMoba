@@ -186,10 +186,11 @@ export class MatchRunner {
     this.queued.delete(tick);
     stepSimulation(this.state, commands);
 
-    if (this.state.tick % this.snapshotEveryTicks === 0 || this.state.winner !== null) {
-      this.emitSnapshot();
+    if (this.state.winner !== null) {
+      this.finish();
+      return;
     }
-    if (this.state.winner !== null) this.finish();
+    if (this.state.tick % this.snapshotEveryTicks === 0) this.emitSnapshot();
   }
 
   snapshot(): AuthoritativeSnapshot<SimulationState> {
