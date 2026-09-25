@@ -125,7 +125,7 @@ The existing game is a feature-rich offline prototype. The migration strategy is
 - [x] tests cover jungle/objective/ward determinism, rewards, visibility and transport.
 - [x] branch CI + PR CI + post-merge main CI green on main @ d6cccf4af9375a7b6fea161cd2538aae88325fab.
 
-## Multiplayer 0.9 — current branch
+## Multiplayer 0.9 — certified and merged
 
 - [x] Ranked 5v5 queue enters an authoritative pre-match draft room instead of launching immediately.
 - [x] stable TOP/JUNGLE/MID/CARRY/SUPPORT slot assignment per team.
@@ -139,7 +139,34 @@ The existing game is a feature-rich offline prototype. The migration strategy is
 - [x] repeatable concurrent 5v5 load probe with command pressure and final state hashes.
 - [x] CI load gate runs 50 concurrent 5v5 matches for 900 ticks each with 10 Hz authoritative snapshot hashing/cloning.
 - [x] load harness verifies repeatable final hashes across identical concurrent runs.
+- [x] branch CI + PR CI + post-merge main CI green on main @ c33c812601cdf72f44a1e1e99c7b64a074e23a45.
+
+## Visual 1.0 — certified and merged
+
+- [x] PixiJS 8 primary authoritative-state renderer.
+- [x] persistent entity scene graph and camera transforms.
+- [x] Low / Medium / High / Ultra render budgets.
+- [x] functional Canvas fallback.
+- [x] renderer authority boundary guard.
+- [x] visual unit suite.
+- [x] branch CI + PR CI + post-merge main CI green on main @ e8980ce53138ea9503054fd01846cbb942e04efc.
+
+## Visual 1.1 — current branch
+
+- [x] combat FX derived only from authoritative/predicted state deltas.
+- [x] GPU particle bursts.
+- [x] Gareth/Luxana Q cast presentation.
+- [x] source-aware root/slow/stun trails.
+- [x] damage rings and floating damage.
+- [x] hit flash.
+- [x] death/objective bursts.
+- [x] quality-scaled screen shake.
+- [x] repeatable visual-only PRNG.
 - [ ] branch CI + PR CI + post-merge main CI certification.
+
+## Visual milestones
+- [ ] 1.2: animated environment, river, vegetation, fog/ambient particles, jungle/objective/ward presentation.
+- [ ] 1.3: cinematic entry/result/objective/level-up polish and Motion-powered HUD transitions.
 
 ## Multiplayer milestones
 - [ ] 1.0: production-ready authoritative 5v5 match architecture.
