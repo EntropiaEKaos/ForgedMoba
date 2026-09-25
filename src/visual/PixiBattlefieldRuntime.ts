@@ -210,7 +210,7 @@ export class PixiBattlefieldRuntime {
   destroy(): void {
     this.destroyed = true;
     this.nodes.clear();
-    if (this.initialized) this.app.destroy({ removeView: false }, { children: true, texture: false });
+    if (this.initialized) this.app.destroy();
     this.initialized = false;
   }
 
