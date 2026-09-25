@@ -11,7 +11,6 @@ function localEntity(state: SimulationState | null, playerId: string | undefined
 }
 
 export function OnlineMatchScreen() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const {
     match,
     matchResult,
