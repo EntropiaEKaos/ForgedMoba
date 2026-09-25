@@ -10,6 +10,7 @@ on:
       - 'network/**'
       - 'multiplayer/**'
       - 'content/**'
+      - 'visual/**'
 
 permissions:
   contents: read
@@ -35,10 +36,22 @@ jobs:
           cache-dependency-path: package-lock.json
 
       - name: Install root dependencies
-        run: npm ci
+        run: npm install --no-audit --no-fund
+
+      - name: Export resolved root lockfile
+        if: startsWith(github.ref, 'refs/heads/visual/')
+        uses: actions/upload-artifact@v4
+        with:
+          name: resolved-root-lockfile
+          path: package-lock.json
+          if-no-files-found: error
+          retention-days: 1
 
       - name: Architecture boundaries
         run: npm run lint:sim-boundaries
+
+      - name: Visual authority boundaries
+        run: npm run lint:visual-boundaries
 
       - name: TypeScript
         run: npm run typecheck
@@ -48,6 +61,9 @@ jobs:
 
       - name: Network client suite
         run: npm run test:network
+
+      - name: Visual unit suite
+        run: npm run test:visual
 
       - name: Production build
         run: npm run build
