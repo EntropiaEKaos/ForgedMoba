@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "lint:sim-boundaries": "node scripts/check-simulation-boundaries.mjs",
-    "lint": "npm run lint:sim-boundaries && npm run typecheck",
+    "lint": "npm run lint:sim-boundaries && npm run lint:visual-boundaries && npm run typecheck",
     "test": "npm run test:sim && npm run test:network && npm run test:visual",
     "test:sim": "node --test --experimental-strip-types src/simulation/*.test.ts",
     "test:network": "node --test --experimental-strip-types src/network/*.test.ts",
@@ -17,7 +17,8 @@
     "server:dev": "npm --prefix server run dev",
     "server:typecheck": "npm --prefix server run typecheck",
     "server:test": "npm --prefix server run test",
-    "test:visual": "node --test --experimental-strip-types src/visual/*.test.ts"
+    "test:visual": "node --test --experimental-strip-types src/visual/*.test.ts",
+    "lint:visual-boundaries": "node scripts/check-visual-boundaries.mjs src/visual/PixiBattlefieldRuntime.ts src/visual/PixiBattlefield.tsx src/visual/CanvasFallbackBattlefield.tsx"
   },
   "dependencies": {
     "clsx": "2.1.1",
