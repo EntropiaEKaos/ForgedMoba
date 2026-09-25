@@ -85,6 +85,7 @@ export class CombatFxRuntime {
   private seenOrder: string[] = [];
   private shakeEnergy = 0;
   private shakePhase = 0;
+  private flashUntil = new Map<number, number>();
 
   observe(state: SimulationState, quality: VisualQuality): void {
     const probe = captureVisualProbe(state);
@@ -173,6 +174,10 @@ export class CombatFxRuntime {
     if (this.shakeEnergy < 0.02) this.shakeEnergy = 0;
   }
 
+  isFlashing(entityId: number, now = performance.now()): boolean {
+    return (this.flashUntil.get(entityId) ?? 0) > now;
+  }
+
   shakeOffset(scale: number): { x: number; y: number } {
     if (this.shakeEnergy <= 0) return { x: 0, y: 0 };
     const amount = this.shakeEnergy * scale;
@@ -200,6 +205,7 @@ export class CombatFxRuntime {
       1;
 
     if (event.type === 'damage') {
+      this.flashUntil.set(event.entityId, performance.now() + 115);
       this.spawnBurst(event.x, event.y, color, Math.ceil(8 * multiplier), 115, 520, fxSeed(event));
       this.spawnDamageLabel(event.x, event.y - 20, event.amount);
       this.spawnRing(event.x, event.y, 8, 32, 260, color);
@@ -215,6 +221,15 @@ export class CombatFxRuntime {
     }
 
     if (event.type === 'status-impact') {
+      this.spawnTrail(
+        event.sourceX,
+        event.sourceY,
+        event.x,
+        event.y,
+        color,
+        Math.ceil(13 * multiplier),
+        fxSeed(event),
+      );
       this.spawnBurst(event.x, event.y, color, Math.ceil(12 * multiplier), 85, 700, fxSeed(event));
       this.spawnRing(event.x, event.y, 12, 58, 500, color);
       return;
@@ -271,6 +286,45 @@ export class CombatFxRuntime {
         gravity: 105,
         lifeMs,
         maxLifeMs: lifeMs,
+      });
+    }
+  }
+
+  private spawnTrail(
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+    color: number,
+    count: number,
+    seed: number,
+  ): void {
+    let rng = seed;
+    for (let i = 0; i < count; i += 1) {
+      const random = nextVisualRandom(rng);
+      rng = random.state;
+      const t = (i + random.value * 0.7) / Math.max(1, count);
+      const wobble = (random.value - 0.5) * 18;
+      const x = x1 + (x2 - x1) * t + wobble;
+      const y = y1 + (y2 - y1) * t - wobble * 0.35;
+      const particle = new Particle({
+        texture: Texture.WHITE,
+        x,
+        y,
+        scaleX: 5,
+        scaleY: 2,
+        rotation: Math.atan2(y2 - y1, x2 - x1),
+        tint: color,
+        alpha: 0.85,
+      });
+      this.particles.addParticle(particle);
+      this.liveParticles.push({
+        particle,
+        vx: 0,
+        vy: -14 - random.value * 20,
+        gravity: 0,
+        lifeMs: 360,
+        maxLifeMs: 360,
       });
     }
   }
