@@ -50,6 +50,9 @@ jobs:
       - name: Architecture boundaries
         run: npm run lint:sim-boundaries
 
+      - name: Visual authority boundaries
+        run: npm run lint:visual-boundaries
+
       - name: TypeScript
         run: npm run typecheck
 
