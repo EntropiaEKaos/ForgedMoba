@@ -45,7 +45,6 @@ export class EnvironmentRuntime {
   private decor: EnvironmentDecor[] = [];
   private key = '';
   private elapsed = 0;
-  private quality: VisualQuality = 'high';
 
   constructor() {
     this.background.addChild(this.river);
@@ -60,7 +59,6 @@ export class EnvironmentRuntime {
     quality: VisualQuality,
   ): void {
     this.elapsed += Math.max(0, Math.min(50, deltaMs)) / 1000;
-    this.quality = quality;
     this.ensureWorld(state.width, state.height, quality);
     this.animateRiver(state.width, state.height);
     this.animateDecor(quality);
