@@ -151,7 +151,7 @@ The existing game is a feature-rich offline prototype. The migration strategy is
 - [x] visual unit suite.
 - [x] branch CI + PR CI + post-merge main CI green on main @ e8980ce53138ea9503054fd01846cbb942e04efc.
 
-## Visual 1.1 — current branch
+## Visual 1.1 — certified and merged
 
 - [x] combat FX derived only from authoritative/predicted state deltas.
 - [x] GPU particle bursts.
@@ -162,10 +162,22 @@ The existing game is a feature-rich offline prototype. The migration strategy is
 - [x] death/objective bursts.
 - [x] quality-scaled screen shake.
 - [x] repeatable visual-only PRNG.
+- [x] branch CI + PR CI + post-merge main CI green on main @ f52b7759d8f21215df507ca27dd05910286fac09.
+
+## Visual 1.2 — current branch
+
+- [x] deterministic environment decoration generator.
+- [x] animated river presentation.
+- [x] vegetation sway and mist drift.
+- [x] torch/light decoration with quality budgets.
+- [x] GPU ambient particles.
+- [x] jungle camp and epic objective aura.
+- [x] allied ward vision presentation.
+- [x] environment layers separated from combat/entity layers.
+- [x] visual authority guard covers environment runtime/model.
 - [ ] branch CI + PR CI + post-merge main CI certification.
 
 ## Visual milestones
-- [ ] 1.2: animated environment, river, vegetation, fog/ambient particles, jungle/objective/ward presentation.
 - [ ] 1.3: cinematic entry/result/objective/level-up polish and Motion-powered HUD transitions.
 
 ## Multiplayer milestones
