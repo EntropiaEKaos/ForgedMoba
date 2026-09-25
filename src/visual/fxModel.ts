@@ -4,7 +4,17 @@ export type CombatFxEvent =
   | { type: 'damage'; tick: number; entityId: number; x: number; y: number; amount: number }
   | { type: 'death'; tick: number; entityId: number; x: number; y: number; kind: SimEntity['kind'] }
   | { type: 'q-cast'; tick: number; entityId: number; x: number; y: number; heroId: SimEntity['heroId'] }
-  | { type: 'status-impact'; tick: number; entityId: number; x: number; y: number; status: 'slow' | 'root' | 'stun' }
+  | {
+      type: 'status-impact';
+      tick: number;
+      entityId: number;
+      sourceId: number;
+      sourceX: number;
+      sourceY: number;
+      x: number;
+      y: number;
+      status: 'slow' | 'root' | 'stun';
+    }
   | { type: 'objective'; tick: number; team: 0 | 1; x: number; y: number };
 
 export interface VisualEntityProbe {
@@ -15,7 +25,7 @@ export interface VisualEntityProbe {
   kind: SimEntity['kind'];
   heroId: SimEntity['heroId'];
   qCooldown: number;
-  statuses: string[];
+  statuses: { kind: string; sourceId: number }[];
 }
 
 export interface VisualStateProbe {
@@ -36,8 +46,8 @@ export function captureVisualProbe(state: SimulationState): VisualStateProbe {
       heroId: entity.heroId,
       qCooldown: entity.abilityCooldowns.Q,
       statuses: entity.statuses
-        .map((status) => status.kind)
-        .sort(),
+        .map((status) => ({ kind: status.kind, sourceId: status.sourceId }))
+        .sort((a, b) => a.kind.localeCompare(b.kind) || a.sourceId - b.sourceId),
     };
   }
   return {
@@ -93,17 +103,21 @@ export function deriveCombatFx(
       });
     }
 
-    const beforeStatuses = new Set(before.statuses);
+    const beforeStatuses = new Set(before.statuses.map((status) => status.kind + ':' + status.sourceId));
     for (const status of now.statuses) {
-      if (beforeStatuses.has(status)) continue;
-      if (status === 'slow' || status === 'root' || status === 'stun') {
+      if (beforeStatuses.has(status.kind + ':' + status.sourceId)) continue;
+      if (status.kind === 'slow' || status.kind === 'root' || status.kind === 'stun') {
+        const source = current.entities[status.sourceId];
         events.push({
           type: 'status-impact',
           tick: current.tick,
           entityId: id,
+          sourceId: status.sourceId,
+          sourceX: source?.x ?? now.x,
+          sourceY: source?.y ?? now.y,
           x: now.x,
           y: now.y,
-          status,
+          status: status.kind,
         });
       }
     }
