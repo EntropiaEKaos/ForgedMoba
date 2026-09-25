@@ -12,6 +12,7 @@ import {
   VISUAL_QUALITY,
   type VisualQuality,
 } from './quality.ts';
+import { CombatFxRuntime } from './CombatFxRuntime.ts';
 
 interface EntityNode {
   root: Container;
@@ -79,6 +80,7 @@ export class PixiBattlefieldRuntime {
   private readonly world = new Container();
   private readonly terrain = new Graphics();
   private readonly entities = new Container();
+  private readonly combatFx = new CombatFxRuntime();
   private readonly nodes = new Map<number, EntityNode>();
   private initialized = false;
   private destroyed = false;
@@ -91,6 +93,7 @@ export class PixiBattlefieldRuntime {
   private cameraY = 1500;
   private cameraZoom = 0.72;
   private terrainKey = '';
+  private lastFrameAt = 0;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -115,7 +118,9 @@ export class PixiBattlefieldRuntime {
     }
 
     this.world.addChild(this.terrain);
+    this.world.addChild(this.combatFx.particles);
     this.world.addChild(this.entities);
+    this.world.addChild(this.combatFx.overlay);
     this.app.stage.addChild(this.world);
     this.app.ticker.stop();
     this.initialized = true;
@@ -144,6 +149,12 @@ export class PixiBattlefieldRuntime {
     this.worldHeight = input.state.height;
     this.ensureTerrain();
 
+    const now = performance.now();
+    const deltaMs = this.lastFrameAt > 0 ? now - this.lastFrameAt : 16.67;
+    this.lastFrameAt = now;
+    this.combatFx.observe(input.state, input.quality);
+    this.combatFx.update(deltaMs, input.quality);
+
     const local = Object.values(input.state.entities)
       .filter((entity) => entity.ownerPlayerId === input.localPlayerId)
       .sort((a, b) => a.id - b.id)[0] ?? null;
@@ -161,7 +172,8 @@ export class PixiBattlefieldRuntime {
     this.clampCamera();
 
     this.world.pivot.set(this.cameraX, this.cameraY);
-    this.world.position.set(this.screenWidth / 2, this.screenHeight / 2);
+    const shake = this.combatFx.shakeOffset(VISUAL_QUALITY[input.quality].screenShakeScale);
+    this.world.position.set(this.screenWidth / 2 + shake.x, this.screenHeight / 2 + shake.y);
     this.world.scale.set(this.cameraZoom);
 
     const remote = new Map(input.interpolated?.entities.map((entity) => [entity.id, entity]) ?? []);
@@ -210,7 +222,12 @@ export class PixiBattlefieldRuntime {
   destroy(): void {
     this.destroyed = true;
     this.nodes.clear();
-    if (this.initialized) this.app.destroy();
+    if (this.initialized) {
+      this.world.removeChild(this.combatFx.particles);
+      this.world.removeChild(this.combatFx.overlay);
+      this.combatFx.destroy();
+      this.app.destroy();
+    }
     this.initialized = false;
   }
 
@@ -319,6 +336,10 @@ export class PixiBattlefieldRuntime {
     const node = this.nodes.get(entity.id) ?? this.createNode(entity, isLocal);
     if (node.signature !== signature(entity, isLocal)) this.rebuildNode(node, entity, isLocal);
     node.root.position.set(x, y);
+
+    const flashing = this.combatFx.isFlashing(entity.id);
+    node.body.scale.set(flashing ? 1.08 : 1);
+    node.body.alpha = flashing ? 0.72 : 1;
 
     const radius = Math.max(7, entity.radius * 1.2);
     node.health.clear();
