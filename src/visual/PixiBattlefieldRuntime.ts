@@ -13,6 +13,7 @@ import {
   type VisualQuality,
 } from './quality.ts';
 import { CombatFxRuntime } from './CombatFxRuntime.ts';
+import { EnvironmentRuntime } from './EnvironmentRuntime.ts';
 
 interface EntityNode {
   root: Container;
@@ -80,6 +81,7 @@ export class PixiBattlefieldRuntime {
   private readonly world = new Container();
   private readonly terrain = new Graphics();
   private readonly entities = new Container();
+  private readonly environment = new EnvironmentRuntime();
   private readonly combatFx = new CombatFxRuntime();
   private readonly nodes = new Map<number, EntityNode>();
   private initialized = false;
@@ -118,8 +120,11 @@ export class PixiBattlefieldRuntime {
     }
 
     this.world.addChild(this.terrain);
+    this.world.addChild(this.environment.background);
+    this.world.addChild(this.environment.ambientParticles);
     this.world.addChild(this.combatFx.particles);
     this.world.addChild(this.entities);
+    this.world.addChild(this.environment.foreground);
     this.world.addChild(this.combatFx.overlay);
     this.app.stage.addChild(this.world);
     this.app.ticker.stop();
@@ -152,6 +157,7 @@ export class PixiBattlefieldRuntime {
     const now = performance.now();
     const deltaMs = this.lastFrameAt > 0 ? now - this.lastFrameAt : 16.67;
     this.lastFrameAt = now;
+    this.environment.update(deltaMs, input.state, input.localPlayerId, input.quality);
     this.combatFx.observe(input.state, input.quality);
     this.combatFx.update(deltaMs, input.quality);
 
@@ -223,8 +229,12 @@ export class PixiBattlefieldRuntime {
     this.destroyed = true;
     this.nodes.clear();
     if (this.initialized) {
+      this.world.removeChild(this.environment.background);
+      this.world.removeChild(this.environment.ambientParticles);
+      this.world.removeChild(this.environment.foreground);
       this.world.removeChild(this.combatFx.particles);
       this.world.removeChild(this.combatFx.overlay);
+      this.environment.destroy();
       this.combatFx.destroy();
       this.app.destroy();
     }
