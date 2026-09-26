@@ -167,7 +167,7 @@ export class CombatFxRuntime {
         continue;
       }
       const ratio = Math.max(0, beam.lifeMs / beam.maxLifeMs);
-      beam.mesh.alpha = ratio * ratio;
+      beam.mesh.alpha = Math.min(1, ratio * 1.2);
     }
 
     for (let i = this.rings.length - 1; i >= 0; i -= 1) {
@@ -282,7 +282,8 @@ export class CombatFxRuntime {
     }
 
     if (event.type === 'status-impact') {
-      this.spawnBeam(event.sourceX, event.sourceY, event.x, event.y, profile.trailWidth * 1.25, profile.secondary, 620);
+      this.spawnBeam(event.sourceX, event.sourceY, event.x, event.y, profile.trailWidth * 1.35, profile.secondary, 900);
+      this.spawnBeam(event.sourceX, event.sourceY, event.x, event.y, profile.trailWidth * 0.34, 0xffffff, 620);
       this.spawnTrail(event.sourceX, event.sourceY, event.x, event.y, color, Math.ceil(15 * multiplier), fxSeed(event));
       this.spawnBurst(event.x, event.y, profile.secondary, Math.ceil(14 * multiplier), 95, 720, fxSeed(event));
       this.spawnRing(event.x, event.y, 12, 64, 520, color);
