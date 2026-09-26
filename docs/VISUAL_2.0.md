@@ -164,3 +164,29 @@ Visual 2.0 is mergeable only after the exact HEAD passes:
 - real Chromium visual proof screenshot.
 
 The same gates must pass again on the PR merge-ref and the merged main SHA.
+
+
+## Premium HUD reconstruction
+
+The original Visual 1.x online HUD was intentionally diagnostic and remained too sparse for a production MOBA presentation.
+
+Visual 2.0 now replaces that layout with a dedicated `PremiumGameHud` while preserving React/Motion as the correct UI layer above PixiJS.
+
+The premium HUD includes:
+
+- top-center team score and objective control;
+- persistent allied/enemy hero frames with portrait, level, HP, CS and gold;
+- production-art hero portrait in the lower command dock;
+- exact HP values and server-derived XP/gold/CS;
+- enlarged Q and ward action slots;
+- visibly locked W/E/R slots until those abilities exist in the authoritative core;
+- six authoritative inventory slots;
+- Rift minimap backed by the v2 terrain asset and real entity coordinates;
+- collapsible authoritative shop on B;
+- network/authority diagnostics moved behind F8;
+- reconnect telemetry moved into the F8 panel instead of occupying the combat view;
+- authoritative cinematic event feed for kills, ACE, towers and epic objectives.
+
+No mana/resource meter is fabricated because the authoritative simulation does not currently expose one.
+
+The HUD only displays state already owned by the simulation/server or local presentation state such as whether a panel is open.
