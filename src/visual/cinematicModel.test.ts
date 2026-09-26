@@ -76,3 +76,26 @@ test('objective and tower events outrank kill presentation', () => {
   assert.equal(events[0]?.type, 'objective-kill');
   assert.ok(events.some((event) => event.type === 'tower-destroyed'));
 });
+
+
+test('cinematic model emits ACE only when a multi-player enemy team is fully dead', () => {
+  const state = createSimulation({
+    seed: 99,
+    players: [
+      { playerId: 'b1', team: 0, x: 800, y: 1000, heroId: 'gareth' },
+      { playerId: 'b2', team: 0, x: 820, y: 1000, heroId: 'luxana' },
+      { playerId: 'b3', team: 0, x: 840, y: 1000, heroId: 'gareth' },
+      { playerId: 'r1', team: 1, x: 1200, y: 1000, heroId: 'luxana' },
+      { playerId: 'r2', team: 1, x: 1220, y: 1000, heroId: 'gareth' },
+      { playerId: 'r3', team: 1, x: 1240, y: 1000, heroId: 'luxana' },
+    ],
+  });
+  const before = captureCinematicProbe(state);
+  for (const entity of Object.values(state.entities)) {
+    if (entity.kind === 'hero' && entity.team === 1) entity.dead = true;
+  }
+  state.score[0] += 1;
+  state.tick += 1;
+  const events = deriveCinematicEvents(before, captureCinematicProbe(state));
+  assert.ok(events.some((event) => event.type === 'ace' && event.team === 0));
+});
