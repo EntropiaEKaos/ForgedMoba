@@ -209,6 +209,11 @@ The existing game is a feature-rich offline prototype. The migration strategy is
 - [x] production art path/reference/size budget CI gate.
 - [x] nested art-manifest visual tests.
 - [x] deterministic Chromium proof automatically exercises the art pack.
+- [x] premium MOBA HUD reconstruction with competitive scoreboard, team portraits and local hero frame.
+- [x] full action bar, cooldown feedback and six-slot inventory surface.
+- [x] tactical minimap using the v2 Rift asset plus authoritative entity positions.
+- [x] shop and network diagnostics preserved behind compact interactive surfaces.
+- [x] Pixi hero/team halos, animated selection arcs, objective aura and tower glow.
 - [x] premium MOBA HUD with team frames, minimap, command dock, inventory, shop and event feed.
 - [x] network diagnostics moved behind F8 instead of permanently occupying the battlefield.
 - [x] W/E/R are explicitly shown as locked until the authoritative core implements them.
