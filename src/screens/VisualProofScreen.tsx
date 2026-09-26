@@ -68,6 +68,19 @@ export function VisualProofScreen() {
         interpolated: null,
         localPlayerId: 'blue-1',
         quality: 'ultra',
+        skinVisuals: {
+          'blue-1': {
+            skinId: 'gareth_ember',
+            heroId: 'gareth',
+            rarity: 'épica',
+            mods: {
+              trailColor: 0xff9050,
+              particleColor: 0xffc070,
+              auraColor: 0xff6020,
+              glowColor: 0xff8040,
+            },
+          },
+        },
       });
       raf = requestAnimationFrame(frame);
     };
