@@ -31,6 +31,11 @@ const portraitStyle = (heroId: string | null): CSSProperties => ({
 const modeLabel = (mode: MatchMode) =>
   mode === 'duel1v1' ? 'DUEL' : mode === 'skirmish3v3' ? 'SKIRMISH 3V3' : 'RANKED 5V5';
 
+const abilityIcon = (name: 'gareth-q' | 'luxana-q' | 'locked-w' | 'locked-e' | 'locked-r' | 'ward') =>
+  '/assets/ui/v2/abilities/' + name + '.svg';
+
+const itemIcon = (id: string) => '/assets/ui/v2/items/' + id + '.svg';
+
 function heroesOf(state: SimulationState | null): SimEntity[] {
   if (!state) return [];
   return Object.values(state.entities)
@@ -79,14 +84,14 @@ function Ability({
   cooldown,
   accent,
   locked,
-  icon,
+  iconSrc,
 }: {
   keyLabel: string;
   name: string;
   cooldown: number;
   accent: string;
   locked?: boolean;
-  icon: string;
+  iconSrc: string;
 }) {
   const ready = cooldown <= 0 && !locked;
   return (
@@ -106,7 +111,12 @@ function Ability({
             : `radial-gradient(circle at 38% 32%, ${accent}55, transparent 38%), linear-gradient(145deg,#17252d,#081015 64%)`,
         }}
       />
-      <div className="absolute inset-0 grid place-items-center pb-1 text-[28px] drop-shadow-[0_0_12px_rgba(255,255,255,.22)]">{icon}</div>
+      <img
+        src={iconSrc}
+        alt=""
+        className={'absolute inset-1 h-[calc(100%-8px)] w-[calc(100%-8px)] object-cover transition ' + (locked ? 'opacity-45 grayscale' : 'opacity-95')}
+      />
+      <div className="absolute inset-1 bg-[linear-gradient(135deg,rgba(255,255,255,.08),transparent_45%,rgba(0,0,0,.22))]" />
       <div className="absolute left-2 top-1 z-10 rounded bg-black/55 px-1.5 py-0.5 font-pixel text-[9px]" style={{ color: locked ? '#667278' : accent }}>
         {keyLabel}
       </div>
@@ -143,7 +153,8 @@ function MiniMap({ state, localPlayerId }: { state: SimulationState | null; loca
       style={{ clipPath: 'polygon(7% 0,93% 0,100% 7%,100% 93%,93% 100%,7% 100%,0 93%,0 7%)' }}
     >
       <img src="/assets/art/v2/terrain/rift-map.svg" alt="" className="absolute inset-0 h-full w-full object-fill opacity-90" />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_45%,rgba(0,0,0,.58))]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_42%,rgba(0,0,0,.56))]" />
+      <div className="absolute inset-[6px] border border-[#f0d36d]/18 shadow-[inset_0_0_30px_rgba(0,0,0,.45)]" />
       <div className="absolute inset-2 border border-[#d4bd67]/20" />
       {entities.map((entity) => {
         const x = entity.x / Math.max(1, state.width) * 100;
@@ -230,7 +241,7 @@ export function PremiumGameHud({
     seconds: Math.max(0, Math.ceil((deadline - Date.now()) / 1000)),
   }));
 
-  const qIcon = local?.heroId === 'gareth' ? '⚔' : '✦';
+  const qIcon = abilityIcon(local?.heroId === 'gareth' ? 'gareth-q' : 'luxana-q');
 
   return (
     <div className="pointer-events-none absolute inset-0 z-20 select-none" data-hud-tier="forged-premium-2">
@@ -244,8 +255,8 @@ export function PremiumGameHud({
         <motion.div
           initial={{ y: -70, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          className="relative h-[74px] min-w-[620px] overflow-hidden border-x border-b border-[#5e6c70] bg-[#061016]/96 px-7 pt-2 shadow-[0_18px_60px_rgba(0,0,0,.58)] backdrop-blur-lg"
-          style={{ clipPath: 'polygon(3% 0,97% 0,100% 100%,68% 100%,64% 78%,36% 78%,32% 100%,0 100%)' }}
+          className="relative h-[62px] min-w-[590px] overflow-hidden border-x border-b border-[#6a7272]/80 bg-[linear-gradient(180deg,rgba(5,13,18,.9),rgba(4,10,14,.72))] px-8 pt-2 shadow-[0_14px_44px_rgba(0,0,0,.52)] backdrop-blur-xl"
+          style={{ clipPath: 'polygon(5% 0,95% 0,100% 82%,94% 100%,66% 100%,62% 78%,38% 78%,34% 100%,6% 100%,0 82%)' }}
         >
           <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-[#f0d36c] to-transparent" />
           <div className="flex items-start justify-between gap-8">
@@ -257,7 +268,7 @@ export function PremiumGameHud({
             <div className="relative -mt-1 text-center">
               <div className="font-pixel text-[9px] tracking-[.2em] text-[#e9cf72]">{modeLabel(mode)}</div>
               <div className="mt-1 text-[9px] uppercase tracking-[.16em] text-[#708891]">FORGED ARENA</div>
-              <div className="mx-auto mt-1.5 h-5 w-5 rotate-45 border border-[#b79b49] bg-[#15140d] shadow-[0_0_18px_rgba(232,200,96,.18)]" />
+              <div className="mx-auto mt-1 h-4 w-4 rotate-45 border border-[#d0b75a] bg-[radial-gradient(circle,#57471a,#15140d_65%)] shadow-[0_0_22px_rgba(232,200,96,.32)]" />
             </div>
 
             <div className="flex min-w-40 items-center justify-end gap-4">
@@ -297,10 +308,11 @@ export function PremiumGameHud({
         transition={{ type: 'spring', stiffness: 135, damping: 19 }}
         className="absolute bottom-0 left-1/2 -translate-x-1/2"
       >
-        <div className="relative flex min-w-[940px] items-end justify-center gap-3 border-x border-t border-[#536166] bg-[#061016]/97 px-6 pb-4 pt-3 shadow-[0_-24px_70px_rgba(0,0,0,.62)] backdrop-blur-lg"
+        <div className="relative flex min-w-[940px] items-end justify-center gap-3 border-x border-t border-[#677070]/80 bg-[linear-gradient(180deg,rgba(6,16,22,.9),rgba(3,9,13,.97))] px-6 pb-4 pt-3 shadow-[0_-24px_70px_rgba(0,0,0,.62)] backdrop-blur-xl"
           style={{ clipPath: 'polygon(4% 0,96% 0,100% 28%,100% 100%,0 100%,0 28%)' }}
         >
-          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#e6c75f] to-transparent" />
+          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#f1d66a] to-transparent" />
+          <div className="absolute left-1/2 top-[-7px] h-3 w-20 -translate-x-1/2 bg-[linear-gradient(90deg,transparent,#d4b652,transparent)] opacity-70 blur-[1px]" />
 
           <div className="mr-3 flex items-end gap-3">
             <div className="relative h-[118px] w-[118px] overflow-hidden border-2 border-[#d9bd62] bg-[#0b1720] shadow-[0_0_34px_rgba(217,189,98,.22)]"
@@ -323,11 +335,11 @@ export function PremiumGameHud({
             </div>
           </div>
 
-          <Ability keyLabel="Q" name={local?.heroId === 'gareth' ? 'Judgment' : 'Prism'} cooldown={qCd} accent="#69d4ff" icon={qIcon} />
-          <Ability keyLabel="W" name="Locked" cooldown={0} accent="#58656b" icon="◈" locked />
-          <Ability keyLabel="E" name="Locked" cooldown={0} accent="#58656b" icon="✧" locked />
-          <Ability keyLabel="R" name="Ultimate" cooldown={0} accent="#b8923e" icon="✹" locked />
-          <Ability keyLabel="4" name="Ward" cooldown={wardCd} accent="#e5c866" icon="◉" />
+          <Ability keyLabel="Q" name={local?.heroId === 'gareth' ? 'Judgment' : 'Prism'} cooldown={qCd} accent="#69d4ff" iconSrc={qIcon} />
+          <Ability keyLabel="W" name="Locked" cooldown={0} accent="#58656b" iconSrc={abilityIcon('locked-w')} locked />
+          <Ability keyLabel="E" name="Locked" cooldown={0} accent="#58656b" iconSrc={abilityIcon('locked-e')} locked />
+          <Ability keyLabel="R" name="Ultimate" cooldown={0} accent="#b8923e" iconSrc={abilityIcon('locked-r')} locked />
+          <Ability keyLabel="4" name="Ward" cooldown={wardCd} accent="#e5c866" iconSrc={abilityIcon('ward')} />
 
           <div className="ml-4">
             <div className="mb-1 text-center font-pixel text-[7px] tracking-[.18em] text-[#677b83]">INVENTORY</div>
@@ -336,9 +348,16 @@ export function PremiumGameHud({
                 const id = local?.inventory[index] ?? null;
                 const item = id ? items.find((candidate) => candidate.id === id) : null;
                 return (
-                  <div key={index} className="relative grid h-[48px] w-[48px] place-items-center border border-[#46535a] bg-[linear-gradient(145deg,#101a1f,#070b0e)] shadow-inner" title={item?.name ?? 'empty'}>
-                    <span className="font-pixel text-[8px] text-[#e7d695]">{item ? item.name.slice(0, 2).toUpperCase() : '·'}</span>
-                    {item && <div className="absolute inset-x-0 bottom-0 h-1 bg-[#c9aa4d]/70" />}
+                  <div key={index} className="relative grid h-[48px] w-[48px] place-items-center overflow-hidden border border-[#4f5b5e] bg-[linear-gradient(145deg,#101a1f,#070b0e)] shadow-inner" title={item?.name ?? 'empty'}>
+                    {item ? (
+                      <>
+                        <img src={itemIcon(item.id)} alt="" className="h-full w-full object-cover" />
+                        <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,.08),transparent_45%)]" />
+                        <div className="absolute inset-x-0 bottom-0 h-1 bg-[#d6b952]" />
+                      </>
+                    ) : (
+                      <div className="h-4 w-4 rotate-45 border border-[#334149] bg-[#0b1115]" />
+                    )}
                   </div>
                 );
               })}
@@ -389,9 +408,13 @@ export function PremiumGameHud({
                     onClick={() => conn.sendBuy(item.id)}
                     className="relative overflow-hidden border border-[#554724] bg-[linear-gradient(145deg,#1d1810,#0b1115)] p-3 text-left disabled:opacity-30"
                   >
-                    <div className="absolute right-2 top-2 text-2xl text-[#c5a94e]/30">◆</div>
-                    <div className="font-pixel text-[8px] text-[#eadb9f]">{item.name}</div>
-                    <div className="mt-3 flex justify-between text-[10px]"><span className="text-[#627982]">EQUIP</span><span className="text-[#e8c860]">{item.cost}g</span></div>
+                    <div className="flex items-center gap-3">
+                      <img src={itemIcon(item.id)} alt="" className="h-12 w-12 border border-[#66582f] object-cover shadow-[0_0_18px_rgba(205,177,81,.08)]" />
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate font-pixel text-[8px] text-[#eadb9f]">{item.name}</div>
+                        <div className="mt-2 flex justify-between text-[10px]"><span className="text-[#627982]">EQUIP</span><span className="text-[#e8c860]">{item.cost}g</span></div>
+                      </div>
+                    </div>
                   </motion.button>
                 );
               })}
