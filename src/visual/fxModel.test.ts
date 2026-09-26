@@ -47,3 +47,42 @@ test('visual PRNG is repeatable for the same event seed', () => {
     b = rb.state;
   }
 });
+
+
+test('expanded visual events cover progression, equipment and future authoritative slots', () => {
+  const state = createSimulation({
+    seed: 12,
+    players: [
+      { playerId: 'a', team: 0, x: 1000, y: 1000, heroId: 'gareth' },
+      { playerId: 'b', team: 1, x: 1060, y: 1000, heroId: 'luxana' },
+    ],
+  });
+  state.entities['1'].hp = 500;
+  const before = captureVisualProbe(state);
+
+  state.entities['1'].hp = 540;
+  state.entities['1'].level += 1;
+  state.entities['1'].inventory.push('longsword');
+  state.entities['1'].abilityCooldowns.W = 30;
+  state.entities['1'].attackTargetId = 2;
+  state.entities['1'].attackCooldownRemaining = 12;
+  state.tick += 1;
+
+  const events = deriveCombatFx(before, captureVisualProbe(state));
+  assert.ok(events.some((event) => event.type === 'heal'));
+  assert.ok(events.some((event) => event.type === 'level-up'));
+  assert.ok(events.some((event) => event.type === 'item-equip' && event.itemId === 'longsword'));
+  assert.ok(events.some((event) => event.type === 'ability-cast' && event.slot === 'W'));
+  assert.ok(events.some((event) => event.type === 'basic-attack' && event.targetId === 2));
+});
+
+test('new authoritative ward entity becomes a visual spawn event', () => {
+  const state = createSimulation({
+    seed: 13,
+    players: [{ playerId: 'a', team: 0, x: 1000, y: 1000, heroId: 'gareth' }],
+  });
+  const before = captureVisualProbe(state);
+  stepSimulation(state, [{ type: 'place-ward', playerId: 'a', seq: 1, tick: state.tick, x: 1100, y: 1000 }]);
+  const events = deriveCombatFx(before, captureVisualProbe(state));
+  assert.ok(events.some((event) => event.type === 'ward-spawn' && event.team === 0));
+});
