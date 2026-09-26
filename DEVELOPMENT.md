@@ -215,7 +215,7 @@ The existing game is a feature-rich offline prototype. The migration strategy is
 - [x] branch CI + PR CI + post-merge main CI green on main @ ec1992c290158bd270dce14f0e20b567b3b7f22e.
 - [x] real Chromium proof inspected with the Premium HUD and production art pack.
 
-## Visual 2.1 — current branch
+## Visual 2.1 — certified and merged
 
 - [x] art pack advanced to `forged-art-v2.1.0`.
 - [x] single batched world atlas for battlefield entities.
@@ -229,8 +229,22 @@ The existing game is a feature-rich offline prototype. The migration strategy is
 - [x] objective and ward visual pulse without touching simulation.
 - [x] world assets participate in hit-flash presentation.
 - [x] Graphics primitives remain as safe fallback.
-- [ ] branch CI + PR CI + post-merge main CI certification.
-- [ ] inspect the real Chromium proof and tune scale/readability if needed.
+- [x] merged into main through PR #17 at 4c4651a11eb5f509a440b488d8900bf5c491a212.
+- [x] world atlas preserved as the baseline for follow-up visual polish.
+
+## Visual 2.1.1 — current branch
+
+- [x] premium top scoreboard and team portrait strips.
+- [x] large local-hero combat panel.
+- [x] Q/W/E/R/ward command dock with cooldown feedback.
+- [x] six-slot inventory surface.
+- [x] tactical minimap using the Visual 2.1 Rift/world assets.
+- [x] shop and network surfaces preserved behind compact controls.
+- [x] Pixi hero halos and animated local selection arcs.
+- [x] epic-objective aura and tower base glow.
+- [x] all effects remain presentation-only.
+- [ ] branch CI + PR CI + post-merge main certification.
+- [ ] inspect new Chromium visual proof before merge.
 
 ## Visual milestones
 - [ ] 2.2: production skins, optimized texture export and expanded hero coverage.
