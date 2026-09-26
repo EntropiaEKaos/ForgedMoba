@@ -156,7 +156,7 @@ export function VisualProofScreen() {
         }
         return next;
       });
-    }, 2860);
+    }, 3000);
 
     const combatTimer = setTimeout(() => {
       setState((current) => {
