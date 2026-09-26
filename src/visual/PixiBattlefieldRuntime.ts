@@ -167,6 +167,7 @@ export class PixiBattlefieldRuntime {
     this.world.addChild(this.environment.background);
     this.world.addChild(this.environment.ambientParticles);
     this.world.addChild(this.combatFx.particles);
+    this.world.addChild(this.combatFx.meshes);
     this.world.addChild(this.entities);
     this.world.addChild(this.environment.foreground);
     this.world.addChild(this.combatFx.overlay);
@@ -321,6 +322,7 @@ export class PixiBattlefieldRuntime {
       this.world.removeChild(this.environment.ambientParticles);
       this.world.removeChild(this.environment.foreground);
       this.world.removeChild(this.combatFx.particles);
+      this.world.removeChild(this.combatFx.meshes);
       this.world.removeChild(this.combatFx.overlay);
       this.environment.destroy();
       this.combatFx.destroy();
