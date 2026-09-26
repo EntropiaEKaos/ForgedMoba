@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'motion/react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import type { NetworkMetricsSnapshot } from '../network/telemetry.ts';
 import type { MatchMode } from '../shared/protocol.ts';
 import type { SimEntity, SimulationState } from '../simulation/types.ts';
@@ -20,7 +20,7 @@ interface PremiumGameHudProps {
   matchResult: { winner: 0 | 1 | null } | null;
 }
 
-const portraitStyle = (heroId: string | null): React.CSSProperties => ({
+const portraitStyle = (heroId: string | null): CSSProperties => ({
   backgroundImage: heroId
     ? `url(/assets/art/v2/heroes/${heroId}-sheet.svg)`
     : undefined,
@@ -113,12 +113,14 @@ function AbilitySlot({
   active,
   cooldown,
   accent,
+  locked = false,
 }: {
   keyLabel: string;
   title: string;
   active: boolean;
   cooldown: number;
   accent: string;
+  locked?: boolean;
 }) {
   return (
     <motion.div
@@ -133,12 +135,18 @@ function AbilitySlot({
       <div className="absolute inset-x-1 bottom-1 z-10 text-center text-[8px] uppercase tracking-[.12em] text-[#9fb1b7]">
         {title}
       </div>
-      {!active && (
+      {locked ? (
+        <div className="absolute inset-0 z-20 grid place-items-center bg-black/72">
+          <span className="font-pixel text-[8px] tracking-[.14em] text-[#69767b]">BLOQ.</span>
+        </div>
+      ) : !active ? (
         <div className="absolute inset-0 z-20 grid place-items-center bg-black/66">
           <span className="font-pixel text-[16px] text-white">{cooldown}s</span>
         </div>
+      ) : (
+        null
       )}
-      {active && (
+      {active && !locked && (
         <motion.div
           className="absolute inset-0 opacity-45"
           animate={{ boxShadow: [`inset 0 0 12px ${accent}`, `inset 0 0 28px ${accent}`, `inset 0 0 12px ${accent}`] }}
@@ -328,9 +336,9 @@ export function PremiumGameHud({
           </div>
 
           <AbilitySlot keyLabel="Q" title={local?.heroId === 'gareth' ? 'Golpe' : 'Luz'} active={qCd === 0} cooldown={qCd} accent="#61cfff" />
-          <AbilitySlot keyLabel="W" title="Bloq." active={false} cooldown={0} accent="#4b5660" />
-          <AbilitySlot keyLabel="E" title="Bloq." active={false} cooldown={0} accent="#4b5660" />
-          <AbilitySlot keyLabel="R" title="Bloq." active={false} cooldown={0} accent="#7a5a2a" />
+          <AbilitySlot keyLabel="W" title="Em breve" active={false} cooldown={0} accent="#4b5660" locked />
+          <AbilitySlot keyLabel="E" title="Em breve" active={false} cooldown={0} accent="#4b5660" locked />
+          <AbilitySlot keyLabel="R" title="Ultimate" active={false} cooldown={0} accent="#7a5a2a" locked />
           <AbilitySlot keyLabel="4" title="Ward" active={wardCd === 0} cooldown={wardCd} accent="#d3ba63" />
 
           <div className="ml-3 grid grid-cols-3 gap-1.5">
