@@ -1,7 +1,9 @@
+import { motion } from 'motion/react';
 import { conn, useConnection } from '../network/connection';
 import type { SimEntity, SimulationState } from '../simulation/types';
 import { CURRENT_AUTHORITATIVE_CONTENT } from '../shared/authoritativeContent';
 import { PixiBattlefield } from '../visual/PixiBattlefield.tsx';
+import { CinematicHud } from '../visual/CinematicHud.tsx';
 
 function localEntity(state: SimulationState | null, playerId: string | undefined): SimEntity | null {
   if (!state || !playerId) return null;
@@ -40,7 +42,22 @@ export function OnlineMatchScreen() {
   return (
     <div className="fixed inset-0 bg-[#07110f] text-[#d8e4e8] overflow-hidden">
       <PixiBattlefield localPlayerId={user?.id} />
-      <div className="absolute top-3 left-3 z-10 bg-[#09131a]/90 border-2 border-[#28434d] px-3 py-2 font-mono text-xs min-w-64">
+      <CinematicHud
+        matchId={match.matchId}
+        mode={match.mode}
+        localPlayerId={user?.id}
+        localTeam={match.team}
+        state={conn.predictedState ?? authoritativeSnapshot?.state ?? null}
+        result={matchResult}
+        serverTickRate={match.serverTickRate}
+        onReturn={() => conn.clearMatch()}
+      />
+      <motion.div
+        initial={{ opacity: 0, x: -28 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.35 }}
+        className="absolute top-3 left-3 z-10 bg-[#09131a]/90 border-2 border-[#28434d] px-3 py-2 font-mono text-xs min-w-64 backdrop-blur-sm"
+      >
         <div className="font-pixel text-[9px] text-[#e8c860] mb-2">FORGED MOBA · AUTHORITATIVE ONLINE</div>
         <div>
           {match.mode === 'duel1v1' ? 'DUEL 1V1' : match.mode === 'skirmish3v3' ? 'SKIRMISH 3V3' : 'RANKED 5V5'}
@@ -60,17 +77,64 @@ export function OnlineMatchScreen() {
         <div className="text-[#71909d] mt-1 break-all">content {match.contentVersion}</div>
         {networkError && <div className="text-[#ff8585] mt-1">network: {networkError}</div>}
         {disconnectedEntries.map((entry) => (
-          <div key={entry.playerId} className="text-[#ffbf66] mt-1">
+          <motion.div
+            key={entry.playerId}
+            className="text-[#ffbf66] mt-1"
+            animate={{ opacity: [1, 0.45, 1] }}
+            transition={{ duration: 1.1, repeat: Infinity }}
+          >
             reconnect {entry.playerId.slice(0, 8)} · {entry.secondsLeft}s
-          </div>
+          </motion.div>
         ))}
-      </div>
+      </motion.div>
 
-      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 bg-[#09131a]/90 border border-[#28434d] px-4 py-2 text-xs">
-        RMB mover · LMB atacar · Q habilidade · 4/V ward · S parar · ESC sair
-      </div>
+      <motion.div
+        initial={{ opacity: 0, y: 28 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2, duration: 0.35 }}
+        className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-2"
+      >
+        <div className="flex gap-2">
+          <div className="relative min-w-20 border-2 border-[#335a6d] bg-[#0b1820]/95 px-3 py-2 text-center">
+            <div className="font-pixel text-[8px] text-[#7fcff0]">Q</div>
+            <div className="mt-1 text-[10px] text-[#cdeaf5]">
+              {(localSnapshotEntity?.abilityCooldowns.Q ?? 0) > 0
+                ? Math.ceil((localSnapshotEntity?.abilityCooldowns.Q ?? 0) / match.serverTickRate) + 's'
+                : 'PRONTA'}
+            </div>
+            {(localSnapshotEntity?.abilityCooldowns.Q ?? 0) > 0 && (
+              <motion.div
+                className="absolute inset-x-0 bottom-0 h-1 bg-[#5aaed2]"
+                initial={{ scaleX: 1 }}
+                animate={{ scaleX: 0 }}
+                transition={{
+                  duration: Math.max(0.1, (localSnapshotEntity?.abilityCooldowns.Q ?? 0) / match.serverTickRate),
+                  ease: 'linear',
+                }}
+                style={{ transformOrigin: 'left' }}
+              />
+            )}
+          </div>
+          <div className="relative min-w-20 border-2 border-[#5a4f2d] bg-[#19150c]/95 px-3 py-2 text-center">
+            <div className="font-pixel text-[8px] text-[#e8c860]">WARD · 4/V</div>
+            <div className="mt-1 text-[10px] text-[#f3e4aa]">
+              {(localSnapshotEntity?.wardCooldownRemaining ?? 0) > 0
+                ? Math.ceil((localSnapshotEntity?.wardCooldownRemaining ?? 0) / match.serverTickRate) + 's'
+                : 'PRONTA'}
+            </div>
+          </div>
+        </div>
+        <div className="bg-[#09131a]/90 border border-[#28434d] px-4 py-2 text-xs backdrop-blur-sm">
+          RMB mover · LMB atacar · Q habilidade · 4/V ward · S parar · ESC sair
+        </div>
+      </motion.div>
 
-      <div className="absolute bottom-3 right-3 z-10 w-64 bg-[#09131a]/95 border-2 border-[#5b4a23] p-3 text-xs">
+      <motion.div
+        initial={{ opacity: 0, x: 28 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ delay: 0.12, duration: 0.35 }}
+        className="absolute bottom-3 right-3 z-10 w-64 bg-[#09131a]/95 border-2 border-[#5b4a23] p-3 text-xs backdrop-blur-sm"
+      >
         <div className="font-pixel text-[8px] text-[#e8c860] mb-2">LOJA AUTORITATIVA · BASE</div>
         <div className="mb-2 text-[#b5c7cc]">
           Ouro: <b className="text-[#ffe080]">{localSnapshotEntity?.gold ?? '—'}</b>
@@ -101,33 +165,16 @@ export function OnlineMatchScreen() {
         <div className="mt-2 text-[10px] text-[#718994] break-words">
           {localSnapshotEntity?.inventory.length ? 'Inventário: ' + localSnapshotEntity.inventory.join(', ') : 'Inventário vazio'}
         </div>
-      </div>
+      </motion.div>
 
-      <button
+      <motion.button
+        initial={{ opacity: 0, y: -18 }}
+        animate={{ opacity: 1, y: 0 }}
         onClick={() => matchResult ? conn.clearMatch() : conn.leaveMatch()}
         className="absolute top-3 right-3 z-10 bg-[#3b1717] border-2 border-[#7f3737] px-3 py-2 font-pixel text-[8px] text-[#ffb0a0]"
       >
         {matchResult ? 'VOLTAR AO LOBBY' : 'ABANDONAR PARTIDA'}
-      </button>
-
-      {matchResult && (
-        <div className="absolute inset-0 z-20 bg-black/65 flex items-center justify-center">
-          <div className="pixel-panel bg-[#0d151c] border-4 border-[#e8c860] p-8 text-center min-w-80">
-            <div className="font-pixel text-[20px] text-[#e8c860] mb-3">
-              {matchResult.winner === match.team ? 'VITÓRIA' : matchResult.winner === null ? 'PARTIDA ENCERRADA' : 'DERROTA'}
-            </div>
-            <div className="text-[#9ab0b8] mb-5">
-              Resultado confirmado pelo servidor autoritativo.
-            </div>
-            <button
-              onClick={() => conn.clearMatch()}
-              className="font-pixel text-[9px] px-6 py-3 bg-[#294d3b] border-2 border-[#4f8d68] text-[#c8ffe0]"
-            >
-              VOLTAR AO LOBBY
-            </button>
-          </div>
-        </div>
-      )}
+      </motion.button>
     </div>
   );
 }
