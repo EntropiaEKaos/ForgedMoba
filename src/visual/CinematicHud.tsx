@@ -26,6 +26,13 @@ interface CinematicHudProps {
 function eventText(event: CinematicEvent, localTeam: 0 | 1): { eyebrow: string; title: string; tone: 'good' | 'bad' | 'neutral' } {
   const allied = 'team' in event ? event.team === localTeam : true;
 
+  if (event.type === 'ace') {
+    return {
+      eyebrow: allied ? 'DOMÍNIO TOTAL' : 'TIME ELIMINADO',
+      title: allied ? 'ACE' : 'ACE INIMIGO',
+      tone: allied ? 'good' : 'bad',
+    };
+  }
   if (event.type === 'objective-kill') {
     return {
       eyebrow: 'OBJETIVO ÉPICO',
