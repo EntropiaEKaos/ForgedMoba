@@ -1,0 +1,18 @@
+{
+  "version": 2,
+  "id": "forged-ui-v2.2.0",
+  "abilities": {
+    "gareth-q": "/assets/ui/v2/abilities/gareth-q.svg",
+    "luxana-q": "/assets/ui/v2/abilities/luxana-q.svg",
+    "locked-w": "/assets/ui/v2/abilities/locked-w.svg",
+    "locked-e": "/assets/ui/v2/abilities/locked-e.svg",
+    "locked-r": "/assets/ui/v2/abilities/locked-r.svg",
+    "ward": "/assets/ui/v2/abilities/ward.svg"
+  },
+  "items": {
+    "longsword": "/assets/ui/v2/items/longsword.svg",
+    "ruby": "/assets/ui/v2/items/ruby.svg",
+    "boots": "/assets/ui/v2/items/boots.svg",
+    "pickaxe": "/assets/ui/v2/items/pickaxe.svg"
+  }
+}
