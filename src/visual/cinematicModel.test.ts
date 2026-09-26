@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createSimulation, stepSimulation } from '../simulation/core.ts';
+import { createSimulation } from '../simulation/core.ts';
 import {
   cameraCueForEvent,
   captureCinematicProbe,
