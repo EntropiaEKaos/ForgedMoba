@@ -246,7 +246,7 @@ The existing game is a feature-rich offline prototype. The migration strategy is
 - [x] branch CI + PR CI + post-merge main CI green on main @ dea5087e8e1fe09a4eee8b145e8949372b5a00f7.
 - [x] real Chromium visual proof inspected before merge; premium HUD and Visual 2.1 world atlas coexist correctly.
 
-## Visual 2.2 — current branch
+## Visual 2.2 — certified and merged
 
 - [x] versioned HUD asset pack `forged-ui-v2.2.0`.
 - [x] bespoke Gareth Q and Luxana Q ability icons.
@@ -263,8 +263,8 @@ The existing game is a feature-rich offline prototype. The migration strategy is
 - [x] Pixi towers receive subtle rotating energy arcs.
 - [x] UI assets are path/budget/viewBox validated by CI.
 - [x] Chromium visual proof fixture exercises equipped item art.
-- [ ] branch CI + PR CI + post-merge main certification.
-- [ ] inspect and archive Visual 2.2 Chromium screenshot.
+- [x] branch CI + PR CI + post-merge main CI green on main @ cce084c538b3c7931a6187f4915ffaf0722fb042.
+- [x] Visual 2.2 Chromium proof inspected and archived before merge.
 
 ## Visual milestones
 - [ ] 2.3: production skins, optimized texture export and expanded hero coverage.
