@@ -1,0 +1,114 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1200" viewBox="0 0 1600 1200">
+  <defs>
+    <linearGradient id="ground" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#152c25"/>
+      <stop offset=".5" stop-color="#0d201b"/>
+      <stop offset="1" stop-color="#173126"/>
+    </linearGradient>
+    <linearGradient id="lane" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#4a4934"/>
+      <stop offset=".5" stop-color="#625e40"/>
+      <stop offset="1" stop-color="#4a4934"/>
+    </linearGradient>
+    <linearGradient id="river" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#16384d"/>
+      <stop offset=".5" stop-color="#245d71"/>
+      <stop offset="1" stop-color="#143b50"/>
+    </linearGradient>
+    <radialGradient id="blueAura">
+      <stop offset="0" stop-color="#55bfff" stop-opacity=".5"/>
+      <stop offset="1" stop-color="#55bfff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="redAura">
+      <stop offset="0" stop-color="#ff6868" stop-opacity=".48"/>
+      <stop offset="1" stop-color="#ff6868" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="soft"><feGaussianBlur stdDeviation="18"/></filter>
+    <pattern id="grass" width="56" height="56" patternUnits="userSpaceOnUse">
+      <path d="M5 49l5-12 3 12M27 18l4-11 4 11M45 45l3-10 4 10" stroke="#2f5644" stroke-width="2" fill="none" opacity=".35"/>
+      <circle cx="17" cy="21" r="2" fill="#315b48" opacity=".35"/>
+    </pattern>
+  </defs>
+  <rect width="1600" height="1200" fill="url(#ground)"/>
+  <rect width="1600" height="1200" fill="url(#grass)"/>
+
+  <!-- jungle clearings -->
+  <path d="M0 0h590l-120 190-150 80-320 5z" fill="#0a1815" opacity=".52"/>
+  <path d="M1600 1200H1010l120-190 150-80 320-5z" fill="#0a1815" opacity=".52"/>
+  <path d="M0 1200h540l-95-160-210-90L0 960z" fill="#10241b" opacity=".6"/>
+  <path d="M1600 0h-540l95 160 210 90 235-10z" fill="#10241b" opacity=".6"/>
+
+  <!-- main lane -->
+  <path d="M0 548 C350 520 530 555 800 600 C1070 645 1260 680 1600 650 L1600 754 C1250 780 1035 730 800 694 C540 650 320 630 0 658Z" fill="url(#lane)" opacity=".9"/>
+  <path d="M0 590 C360 565 565 600 800 642 C1060 688 1280 714 1600 694" fill="none" stroke="#9b9464" stroke-opacity=".28" stroke-width="8" stroke-dasharray="18 30"/>
+
+  <!-- river -->
+  <path d="M720 -20 C690 210 745 410 790 565 C850 770 870 955 820 1220 L1000 1220 C1040 980 1005 760 942 555 C890 385 860 185 900 -20Z" fill="url(#river)" opacity=".92"/>
+  <path d="M796 -20 C770 210 810 395 855 565 C905 758 930 970 895 1220" fill="none" stroke="#76d4df" stroke-opacity=".25" stroke-width="7"/>
+  <path d="M850 120 C820 240 855 320 900 410M888 810c28 95 24 180 8 270" fill="none" stroke="#b5f3ed" stroke-opacity=".17" stroke-width="4"/>
+
+  <!-- base glows -->
+  <circle cx="160" cy="650" r="250" fill="url(#blueAura)" filter="url(#soft)"/>
+  <circle cx="1440" cy="650" r="250" fill="url(#redAura)" filter="url(#soft)"/>
+
+  <!-- bases -->
+  <g transform="translate(105 565)">
+    <path d="M0 90L60 10l60 80-18 78H18z" fill="#1b415d" stroke="#67b9e8" stroke-width="8"/>
+    <circle cx="60" cy="82" r="29" fill="#74ccff" opacity=".8"/>
+    <path d="M60 32l17 32-17 19-17-19z" fill="#d4f4ff"/>
+  </g>
+  <g transform="translate(1375 565)">
+    <path d="M0 90L60 10l60 80-18 78H18z" fill="#5d2424" stroke="#f37b70" stroke-width="8"/>
+    <circle cx="60" cy="82" r="29" fill="#ff8177" opacity=".82"/>
+    <path d="M60 32l17 32-17 19-17-19z" fill="#ffe1d8"/>
+  </g>
+
+  <!-- towers -->
+  <g fill="#1d3d4b" stroke="#5ea7c7" stroke-width="5">
+    <path d="M365 585h58l12 95-41 25-41-25z"/>
+    <path d="M590 595h52l10 86-36 22-36-22z"/>
+  </g>
+  <g fill="#512928" stroke="#c96764" stroke-width="5">
+    <path d="M1175 610h58l12 95-41 25-41-25z"/>
+    <path d="M958 605h52l10 86-36 22-36-22z"/>
+  </g>
+
+  <!-- jungle monoliths -->
+  <g fill="#203b30" stroke="#456b55" stroke-width="4" opacity=".9">
+    <path d="M235 250l40-70 54 65-17 92-55 8z"/>
+    <path d="M440 955l38-72 55 60-9 92-61 5z"/>
+    <path d="M1210 210l45-76 58 74-15 90-60 9z"/>
+    <path d="M1285 925l46-75 57 65-16 98-61 5z"/>
+  </g>
+
+  <!-- camps -->
+  <g transform="translate(515 320)">
+    <circle r="72" fill="#18382d" stroke="#3e7b5f" stroke-width="7"/>
+    <circle r="48" fill="#0b1814" stroke="#62957b" stroke-width="3"/>
+    <path d="M-28 12l18-42 18 32 24-22 11 49-42 28z" fill="#7b6543" stroke="#c39b58" stroke-width="4"/>
+  </g>
+  <g transform="translate(1090 895)">
+    <circle r="72" fill="#18382d" stroke="#3e7b5f" stroke-width="7"/>
+    <circle r="48" fill="#0b1814" stroke="#62957b" stroke-width="3"/>
+    <path d="M-28 12l18-42 18 32 24-22 11 49-42 28z" fill="#7b6543" stroke="#c39b58" stroke-width="4"/>
+  </g>
+
+  <!-- epic objective -->
+  <g transform="translate(885 190)">
+    <circle r="105" fill="#271b38" opacity=".85"/>
+    <circle r="84" fill="none" stroke="#9256c7" stroke-width="9" opacity=".65"/>
+    <path d="M0-70l25 42 48-4-25 42 23 43-49-8L0 82l-22-37-49 8 23-43-25-42 48 4z" fill="#7a3e9f" stroke="#d29dff" stroke-width="5"/>
+    <circle r="21" fill="#f0d8ff"/>
+  </g>
+
+  <!-- decorative rocks -->
+  <g fill="#263932" stroke="#39534a" stroke-width="3" opacity=".9">
+    <path d="M120 210l45-46 56 12 19 55-35 42-66-8z"/>
+    <path d="M330 1000l45-40 54 8 18 50-34 42-61-5z"/>
+    <path d="M1360 180l48-41 53 15 13 49-40 40-58-9z"/>
+    <path d="M1220 1050l43-44 62 11 10 49-37 39-59-5z"/>
+  </g>
+
+  <!-- vignette -->
+  <rect x="10" y="10" width="1580" height="1180" rx="42" fill="none" stroke="#020706" stroke-opacity=".55" stroke-width="38"/>
+</svg>
