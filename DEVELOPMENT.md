@@ -209,6 +209,9 @@ The existing game is a feature-rich offline prototype. The migration strategy is
 - [x] production art path/reference/size budget CI gate.
 - [x] nested art-manifest visual tests.
 - [x] deterministic Chromium proof automatically exercises the art pack.
+- [x] premium MOBA HUD with team frames, minimap, command dock, inventory, shop and event feed.
+- [x] network diagnostics moved behind F8 instead of permanently occupying the battlefield.
+- [x] W/E/R are explicitly shown as locked until the authoritative core implements them.
 - [ ] branch CI + PR CI + post-merge main CI certification.
 - [ ] inspect and archive the new real Chromium screenshot.
 
