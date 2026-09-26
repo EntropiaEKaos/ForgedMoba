@@ -18,7 +18,7 @@
     "server:typecheck": "npm --prefix server run typecheck",
     "server:test": "npm --prefix server run test",
     "test:visual": "node --test --experimental-strip-types src/visual/*.test.ts",
-    "lint:visual-boundaries": "node scripts/check-visual-boundaries.mjs src/visual/PixiBattlefieldRuntime.ts src/visual/PixiBattlefield.tsx src/visual/CanvasFallbackBattlefield.tsx src/visual/CombatFxRuntime.ts src/visual/fxModel.ts src/visual/EnvironmentRuntime.ts src/visual/environmentModel.ts"
+    "lint:visual-boundaries": "node scripts/check-visual-boundaries.mjs src/visual/PixiBattlefieldRuntime.ts src/visual/PixiBattlefield.tsx src/visual/CanvasFallbackBattlefield.tsx src/visual/CombatFxRuntime.ts src/visual/fxModel.ts src/visual/EnvironmentRuntime.ts src/visual/environmentModel.ts src/visual/cinematicModel.ts src/visual/CinematicHud.tsx"
   },
   "dependencies": {
     "clsx": "2.1.1",
