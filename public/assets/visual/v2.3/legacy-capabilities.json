@@ -1,0 +1,801 @@
+{
+  "version": 3,
+  "id": "forged-visual-capabilities-v2.3.0",
+  "generatedFrom": "legacy-game-catalog",
+  "authorityNote": "Catalog coverage is visual/content metadata only. Online execution remains bound to authoritative simulation support.",
+  "counts": {
+    "heroes": 48,
+    "items": 39,
+    "runes": 15,
+    "summoners": 8,
+    "skins": 20,
+    "abilityKeys": 235
+  },
+  "heroes": [
+    {
+      "id": "gareth",
+      "name": "Gareth"
+    },
+    {
+      "id": "anya",
+      "name": "Anya"
+    },
+    {
+      "id": "ashka",
+      "name": "Ashka"
+    },
+    {
+      "id": "yamir",
+      "name": "Yamir"
+    },
+    {
+      "id": "rizar",
+      "name": "Rizar"
+    },
+    {
+      "id": "timo",
+      "name": "Timo"
+    },
+    {
+      "id": "luxana",
+      "name": "Luxana"
+    },
+    {
+      "id": "darion",
+      "name": "Darion"
+    },
+    {
+      "id": "katya",
+      "name": "Katya"
+    },
+    {
+      "id": "blitz",
+      "name": "Blitz"
+    },
+    {
+      "id": "warrik",
+      "name": "Warrik"
+    },
+    {
+      "id": "morgause",
+      "name": "Morgause"
+    },
+    {
+      "id": "jaina",
+      "name": "Jaina"
+    },
+    {
+      "id": "thresk",
+      "name": "Thresk"
+    },
+    {
+      "id": "jinxara",
+      "name": "Jinxara"
+    },
+    {
+      "id": "yasuke",
+      "name": "Yasuke"
+    },
+    {
+      "id": "zedric",
+      "name": "Zedric"
+    },
+    {
+      "id": "sonara",
+      "name": "Sonara"
+    },
+    {
+      "id": "garen",
+      "name": "Garen"
+    },
+    {
+      "id": "malzahar",
+      "name": "Malzahar"
+    },
+    {
+      "id": "nidalee",
+      "name": "Nidalee"
+    },
+    {
+      "id": "akali",
+      "name": "Akali"
+    },
+    {
+      "id": "braum",
+      "name": "Braum"
+    },
+    {
+      "id": "volcarn",
+      "name": "Volcarn"
+    },
+    {
+      "id": "aethel",
+      "name": "Aethel"
+    },
+    {
+      "id": "cogsworth",
+      "name": "Cogsworth"
+    },
+    {
+      "id": "myrmidon",
+      "name": "Myrmidon"
+    },
+    {
+      "id": "noctara",
+      "name": "Noctara"
+    },
+    {
+      "id": "kragmar",
+      "name": "Kragmar"
+    },
+    {
+      "id": "solanis",
+      "name": "Solanis"
+    },
+    {
+      "id": "umbrath",
+      "name": "Umbrath"
+    },
+    {
+      "id": "thornveil",
+      "name": "Thornveil"
+    },
+    {
+      "id": "glimmerfin",
+      "name": "Glimmerfin"
+    },
+    {
+      "id": "ironpeak",
+      "name": "Ironpeak"
+    },
+    {
+      "id": "vesper",
+      "name": "Vesper"
+    },
+    {
+      "id": "cinderfox",
+      "name": "Cinderfox"
+    },
+    {
+      "id": "galen",
+      "name": "Galen"
+    },
+    {
+      "id": "riftborn",
+      "name": "Riftborn"
+    },
+    {
+      "id": "boulderback",
+      "name": "Boulderback"
+    },
+    {
+      "id": "shrike",
+      "name": "Shrike"
+    },
+    {
+      "id": "mossheart",
+      "name": "Mossheart"
+    },
+    {
+      "id": "vexfire",
+      "name": "Vexfire"
+    },
+    {
+      "id": "tideweaver",
+      "name": "Tideweaver"
+    },
+    {
+      "id": "grimfang",
+      "name": "Grimfang"
+    },
+    {
+      "id": "starcaller",
+      "name": "Starcaller"
+    },
+    {
+      "id": "rustjaw",
+      "name": "Rustjaw"
+    },
+    {
+      "id": "frostbite",
+      "name": "Frostbite"
+    },
+    {
+      "id": "lumen",
+      "name": "Lumen"
+    }
+  ],
+  "items": [
+    {
+      "id": "longsword",
+      "name": "Espada Longa"
+    },
+    {
+      "id": "dagger",
+      "name": "Adaga"
+    },
+    {
+      "id": "amptome",
+      "name": "Tomo Amplificador"
+    },
+    {
+      "id": "ruby",
+      "name": "Cristal de Rubi"
+    },
+    {
+      "id": "sapphire",
+      "name": "Cristal de Safira"
+    },
+    {
+      "id": "clotharmor",
+      "name": "Armadura de Pano"
+    },
+    {
+      "id": "nullmantle",
+      "name": "Manto Nulificador"
+    },
+    {
+      "id": "boots",
+      "name": "Botas de Velocidade"
+    },
+    {
+      "id": "vampscepter",
+      "name": "Cetro Vampírico"
+    },
+    {
+      "id": "pickaxe",
+      "name": "Picareta"
+    },
+    {
+      "id": "bfsword",
+      "name": "Espada B.F."
+    },
+    {
+      "id": "blastingwand",
+      "name": "Cajado Desmedido"
+    },
+    {
+      "id": "infinityedge",
+      "name": "Gume do Infinito"
+    },
+    {
+      "id": "bloodthirster",
+      "name": "Sedenta por Sangue"
+    },
+    {
+      "id": "deathcap",
+      "name": "Capuz Mortal de Rabadan"
+    },
+    {
+      "id": "voidstaff",
+      "name": "Cajado do Vazio"
+    },
+    {
+      "id": "zhonya",
+      "name": "Ampulheta de Zhonya"
+    },
+    {
+      "id": "frozenmallet",
+      "name": "Malho Congelado"
+    },
+    {
+      "id": "thornmail",
+      "name": "Armadura de Espinhos"
+    },
+    {
+      "id": "warmog",
+      "name": "Coração de Warmung"
+    },
+    {
+      "id": "sunfire",
+      "name": "Capa do Fogo Solar"
+    },
+    {
+      "id": "banshee",
+      "name": "Véu da Fada Sombria"
+    },
+    {
+      "id": "berserker",
+      "name": "Grevas do Berserker"
+    },
+    {
+      "id": "sorcshoes",
+      "name": "Sapatos do Feiticeiro"
+    },
+    {
+      "id": "ninjatabi",
+      "name": "Tabi Ninja"
+    },
+    {
+      "id": "phantomdancer",
+      "name": "Dançarina Fantasma"
+    },
+    {
+      "id": "randuins",
+      "name": "Ampulheta de Randuin"
+    },
+    {
+      "id": "qss",
+      "name": "Cinto de Quicksilver"
+    },
+    {
+      "id": "ward",
+      "name": "Ward de Visão"
+    },
+    {
+      "id": "youmuus",
+      "name": "Fantasma de Youmuu"
+    },
+    {
+      "id": "abyssalmask",
+      "name": "Máscara Abissal"
+    },
+    {
+      "id": "blackcleaver",
+      "name": "Corte Sombrio"
+    },
+    {
+      "id": "deathsdance",
+      "name": "Dança da Morte"
+    },
+    {
+      "id": "nashorstooth",
+      "name": "Dente de Nashor"
+    },
+    {
+      "id": "lichbane",
+      "name": "Sedeção de Lich"
+    },
+    {
+      "id": "spiritvisage",
+      "name": "Visão Espiritual"
+    },
+    {
+      "id": "goredrinker",
+      "name": "Bebedor de Sangue"
+    },
+    {
+      "id": "mawofmalmortius",
+      "name": "Fauces de Malmortius"
+    },
+    {
+      "id": "steraksgage",
+      "name": "Medidor de Sterak"
+    }
+  ],
+  "runes": [
+    {
+      "id": "conqueror",
+      "name": "Conquistador"
+    },
+    {
+      "id": "electrocute",
+      "name": "Eletrocutar"
+    },
+    {
+      "id": "aftershock",
+      "name": "Pós-Choque"
+    },
+    {
+      "id": "fleetwork",
+      "name": "Passo Ligeiro"
+    },
+    {
+      "id": "arcanecomet",
+      "name": "Cometa Arcano"
+    },
+    {
+      "id": "presence",
+      "name": "Presença de Espírito"
+    },
+    {
+      "id": "bloodline",
+      "name": "Linhagem Sanguínea"
+    },
+    {
+      "id": "transcendence",
+      "name": "Transcendência"
+    },
+    {
+      "id": "ironclad",
+      "name": "Couraça de Ferro"
+    },
+    {
+      "id": "giantslayer",
+      "name": "Matador de Gigantes"
+    },
+    {
+      "id": "swift",
+      "name": "Rapidez"
+    },
+    {
+      "id": "vitality",
+      "name": "Vitalidade"
+    },
+    {
+      "id": "precision",
+      "name": "Precisão"
+    },
+    {
+      "id": "sorcery",
+      "name": "Feitiçaria"
+    },
+    {
+      "id": "brutality",
+      "name": "Brutalidade"
+    }
+  ],
+  "summoners": [
+    {
+      "id": "flash",
+      "name": "Flash"
+    },
+    {
+      "id": "ignite",
+      "name": "Incendiar"
+    },
+    {
+      "id": "heal",
+      "name": "Cura"
+    },
+    {
+      "id": "smite",
+      "name": "Castigar"
+    },
+    {
+      "id": "exhaust",
+      "name": "Esgotar"
+    },
+    {
+      "id": "teleport",
+      "name": "Teleporte"
+    },
+    {
+      "id": "barrier",
+      "name": "Barreira"
+    },
+    {
+      "id": "clarity",
+      "name": "Clareza"
+    }
+  ],
+  "skins": [
+    {
+      "id": "gareth_commander",
+      "heroId": "gareth",
+      "name": "Comandante de Aço"
+    },
+    {
+      "id": "gareth_ember",
+      "heroId": "gareth",
+      "name": "Cavaleiro de Brasas"
+    },
+    {
+      "id": "gareth_void",
+      "heroId": "gareth",
+      "name": "Cavaleiro do Vazio"
+    },
+    {
+      "id": "anya_mecha",
+      "heroId": "anya",
+      "name": "Anya 3000"
+    },
+    {
+      "id": "anya_pumpkin",
+      "heroId": "anya",
+      "name": "Mestra da Abóbora"
+    },
+    {
+      "id": "ashka_amazed",
+      "heroId": "ashka",
+      "name": "Arqueira Maravilha"
+    },
+    {
+      "id": "ashka_frostqueen",
+      "heroId": "ashka",
+      "name": "Rainha do Gelo"
+    },
+    {
+      "id": "yamir_assassin",
+      "heroId": "yamir",
+      "name": "Fantasma Juju"
+    },
+    {
+      "id": "yamir_duelist",
+      "heroId": "yamir",
+      "name": "Duelista Carmesim"
+    },
+    {
+      "id": "rizar_darkchills",
+      "heroId": "rizar",
+      "name": "Mago das Trevas"
+    },
+    {
+      "id": "timo_happy",
+      "heroId": "timo",
+      "name": "Timo Feliz"
+    },
+    {
+      "id": "timo_recon",
+      "heroId": "timo",
+      "name": "Rebelde Urso"
+    },
+    {
+      "id": "lux_star",
+      "heroId": "luxana",
+      "name": "Lux das Estrelas"
+    },
+    {
+      "id": "darion_rubytitan",
+      "heroId": "darion",
+      "name": "Titã de Rubi"
+    },
+    {
+      "id": "darion_cyber",
+      "heroId": "darion",
+      "name": "Noxus Cibernético"
+    },
+    {
+      "id": "katya_ivory",
+      "heroId": "katya",
+      "name": "Lâmina de Marfim"
+    },
+    {
+      "id": "blitz_machn",
+      "heroId": "blitz",
+      "name": "Goleta Mecânica"
+    },
+    {
+      "id": "blitz_pilot",
+      "heroId": "blitz",
+      "name": "Golem Piloto"
+    },
+    {
+      "id": "warrik_zombie",
+      "heroId": "warrik",
+      "name": "Lobo Carniceiro"
+    },
+    {
+      "id": "morg_ghostly",
+      "heroId": "morgause",
+      "name": "Anja Espectral"
+    }
+  ],
+  "abilityKeys": [
+    "abyssalshell",
+    "abyssvortex",
+    "aerialstrike",
+    "alphastrike",
+    "ancientshell",
+    "apprehend",
+    "arcanemastery",
+    "barkskin",
+    "biobeam",
+    "bioluminescence",
+    "blackhole",
+    "blackshield",
+    "blindingdart",
+    "blizzard",
+    "bloodscent",
+    "bloodthirst",
+    "boulder",
+    "bouncingblade",
+    "bouncycog",
+    "bugcloud",
+    "bushwhack",
+    "camouflage",
+    "caustic",
+    "chitinshield",
+    "clawstorm",
+    "comet",
+    "constellation",
+    "courage",
+    "crabclaw",
+    "crescendo",
+    "crescendo_spd",
+    "cripplingstrike",
+    "crystalarrow",
+    "crystalward",
+    "cursefield",
+    "darkbinding",
+    "darkcage",
+    "dawnpierce",
+    "deathhook",
+    "deathlotus",
+    "deathmark",
+    "decimate",
+    "decisive",
+    "demacian",
+    "demonfury",
+    "desperatepower",
+    "devilleap",
+    "devourswarm",
+    "discipline",
+    "disintegrate",
+    "doublestrike",
+    "dreamecho",
+    "embercone",
+    "eshock",
+    "eternalbastion",
+    "eternalhunger",
+    "execution",
+    "fallingstar",
+    "featherblades",
+    "fietail",
+    "finalspark",
+    "finalsymphony",
+    "fireorb",
+    "firepelt",
+    "flamechompers",
+    "flamestep",
+    "flay",
+    "forestawaken",
+    "forestwrath",
+    "foxspirit",
+    "freeze",
+    "frostarrow",
+    "frosthbreath",
+    "frosthit",
+    "frostring",
+    "frostshot",
+    "frosttouch",
+    "frozenstrike",
+    "gate",
+    "gears",
+    "getexcited",
+    "glacialfence",
+    "glacialtremor",
+    "graniteskin",
+    "guillotine",
+    "gust",
+    "haste",
+    "hawkshot",
+    "healingspores",
+    "healsong",
+    "healwave",
+    "hemorrhage",
+    "highlander",
+    "hungeringstrike",
+    "hurlspear",
+    "icebreak",
+    "iceskin",
+    "icyembrace",
+    "illumination",
+    "immunity",
+    "incinerate",
+    "infiniteduress",
+    "inkcloud",
+    "javelin",
+    "judgment",
+    "krakengrip",
+    "lastbreath",
+    "lightbinding",
+    "lightfragments",
+    "lightsanctuary",
+    "lightward",
+    "livingshadow",
+    "lucent",
+    "magmadash",
+    "magmaheart",
+    "manabarrier",
+    "meditate",
+    "megamecha",
+    "meteorshower",
+    "minieruption",
+    "miraclecure",
+    "moltenshield",
+    "mountainslam",
+    "movequick",
+    "nethergrasp",
+    "nightmarch",
+    "nightmare",
+    "overclock",
+    "overdrive",
+    "overload",
+    "perseverance",
+    "pheromone",
+    "photosynth",
+    "plaguecloud",
+    "powerfist",
+    "predatordive",
+    "primalheal",
+    "prism",
+    "prismatic",
+    "prismbeam",
+    "prowl",
+    "pumaform",
+    "puppetpull",
+    "puppetshow",
+    "pyromania",
+    "radiantaura",
+    "rangerfocus",
+    "razorshuriken",
+    "realitycollapse",
+    "recycle",
+    "rendingclaw",
+    "resonance",
+    "rocketgrab",
+    "roottrap",
+    "runeprison",
+    "rustgrenade",
+    "scrapshot",
+    "seedbomb",
+    "seismicfist",
+    "serum",
+    "shadowdance",
+    "shadowmark",
+    "shadowpounce",
+    "shadowslash",
+    "shadowstrings",
+    "sharpnote",
+    "shellfortress",
+    "shellroll",
+    "shroom",
+    "shunpo",
+    "shurikenflip",
+    "silversona",
+    "sinistersteel",
+    "skytempest",
+    "sleepmist",
+    "slowfield",
+    "smokebomb",
+    "sonicwave",
+    "soulharvest",
+    "soulshackles",
+    "soulsiphon",
+    "spacefold",
+    "spellflux",
+    "spiritshield",
+    "standbehind",
+    "stardust",
+    "staticfield",
+    "steelblade",
+    "stellarenergy",
+    "stonehide",
+    "stonewall",
+    "stormsong",
+    "sulfurdart",
+    "sunblessing",
+    "sunrevival",
+    "supernova",
+    "superrocket",
+    "swarmplague",
+    "sweepingblade",
+    "switcheroo",
+    "terrorhowl",
+    "thornwhip",
+    "tibbers",
+    "tidalflow",
+    "timestop",
+    "tormentedsoil",
+    "tornado",
+    "toxicshot",
+    "toxinflask",
+    "trunkfist",
+    "tsunami",
+    "turret",
+    "turtlequake",
+    "turtletuck",
+    "vitalsap",
+    "voidcall",
+    "voidgate",
+    "voidshield",
+    "voidwhispers",
+    "volcanoerupt",
+    "volley",
+    "voracity",
+    "voraxblade",
+    "warhowl",
+    "waterblade",
+    "waterjet",
+    "waterprison",
+    "wildbite",
+    "windflow",
+    "windwall",
+    "wingcut",
+    "wolfshape",
+    "wuju",
+    "yetivalanche",
+    "zap"
+  ]
+}
