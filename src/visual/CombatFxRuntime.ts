@@ -282,7 +282,7 @@ export class CombatFxRuntime {
     }
 
     if (event.type === 'status-impact') {
-      this.spawnBeam(event.sourceX, event.sourceY, event.x, event.y, profile.trailWidth, profile.secondary, 330);
+      this.spawnBeam(event.sourceX, event.sourceY, event.x, event.y, profile.trailWidth * 1.25, profile.secondary, 620);
       this.spawnTrail(event.sourceX, event.sourceY, event.x, event.y, color, Math.ceil(15 * multiplier), fxSeed(event));
       this.spawnBurst(event.x, event.y, profile.secondary, Math.ceil(14 * multiplier), 95, 720, fxSeed(event));
       this.spawnRing(event.x, event.y, 12, 64, 520, color);
