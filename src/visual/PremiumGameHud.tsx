@@ -1,10 +1,11 @@
 import { AnimatePresence, motion } from 'motion/react';
-import { useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import type { NetworkMetricsSnapshot } from '../network/telemetry.ts';
 import type { MatchMode } from '../shared/protocol.ts';
 import type { SimEntity, SimulationState } from '../simulation/types.ts';
 import { CURRENT_AUTHORITATIVE_CONTENT } from '../shared/authoritativeContent.ts';
 import { conn } from '../network/connection.ts';
+import { CinematicObserver, type CinematicEvent } from './cinematicModel.ts';
 
 interface PremiumGameHudProps {
   state: SimulationState | null;
@@ -213,6 +214,16 @@ function MiniMap({
   );
 }
 
+function feedLabel(event: CinematicEvent, localTeam: 0 | 1): { text: string; good: boolean } {
+  const allied = 'team' in event ? event.team === localTeam : true;
+  if (event.type === 'ace') return { text: allied ? 'ACE aliado' : 'ACE inimigo', good: allied };
+  if (event.type === 'objective-kill') return { text: allied ? 'Objetivo conquistado' : 'Objetivo perdido', good: allied };
+  if (event.type === 'tower-destroyed') return { text: allied ? 'Torre inimiga destruída' : 'Torre aliada destruída', good: allied };
+  if (event.type === 'hero-kill') return { text: allied ? 'Abate aliado' : 'Baixa aliada', good: allied };
+  if (event.type === 'level-up') return { text: 'Nível ' + event.level, good: true };
+  return { text: 'Retorno à batalha', good: true };
+}
+
 export function PremiumGameHud({
   state,
   localPlayerId,
@@ -228,6 +239,8 @@ export function PremiumGameHud({
 }: PremiumGameHudProps) {
   const [shopOpen, setShopOpen] = useState(false);
   const [debugOpen, setDebugOpen] = useState(false);
+  const observerRef = useRef(new CinematicObserver());
+  const [feed, setFeed] = useState<Array<{ key: string; event: CinematicEvent }>>([]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -240,6 +253,27 @@ export function PremiumGameHud({
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
+
+  useEffect(() => {
+    observerRef.current.reset();
+    setFeed([]);
+  }, [matchId]);
+
+  useEffect(() => {
+    if (!state) return;
+    const events = observerRef.current.observe(state)
+      .filter((event) =>
+        event.type === 'hero-kill' ||
+        event.type === 'objective-kill' ||
+        event.type === 'tower-destroyed' ||
+        event.type === 'ace'
+      );
+    if (events.length === 0) return;
+    setFeed((current) => [
+      ...events.map((event) => ({ key: event.key, event })),
+      ...current,
+    ].slice(0, 4));
+  }, [state]);
 
   const heroes = useMemo(() => heroEntities(state), [state]);
   const blue = heroes.filter((hero) => hero.team === 0);
@@ -284,6 +318,30 @@ export function PremiumGameHud({
             </div>
           </div>
         </motion.div>
+      </div>
+
+      <div className="absolute left-1/2 top-20 -translate-x-1/2">
+        <AnimatePresence initial={false}>
+          {feed.map(({ key, event }) => {
+            const label = feedLabel(event, localTeam);
+            return (
+              <motion.div
+                key={key}
+                initial={{ opacity: 0, y: -12, scale: .96 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -10 }}
+                className={
+                  'mb-1 border px-3 py-1.5 text-center text-[10px] uppercase tracking-[.18em] backdrop-blur-sm ' +
+                  (label.good
+                    ? 'border-[#7c6830] bg-[#171207]/88 text-[#e7d181]'
+                    : 'border-[#703636] bg-[#1b0a0a]/88 text-[#ff9b92]')
+                }
+              >
+                {label.text}
+              </motion.div>
+            );
+          })}
+        </AnimatePresence>
       </div>
 
       <div className="absolute left-3 top-16 flex flex-col gap-1.5">
