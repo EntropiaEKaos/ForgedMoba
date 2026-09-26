@@ -29,6 +29,7 @@ export interface VisualEntityProbe {
   x: number;
   y: number;
   kind: SimEntity['kind'];
+  team: 0 | 1;
   heroId: SimEntity['heroId'];
   qCooldown: number;
   abilityCooldowns: { Q: number; W: number; E: number; R: number };
@@ -54,6 +55,7 @@ export function captureVisualProbe(state: SimulationState): VisualStateProbe {
       x: entity.x,
       y: entity.y,
       kind: entity.kind,
+      team: entity.team,
       heroId: entity.heroId,
       qCooldown: entity.abilityCooldowns.Q,
       abilityCooldowns: { ...entity.abilityCooldowns },
