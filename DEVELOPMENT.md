@@ -282,7 +282,7 @@ The existing game is a feature-rich offline prototype. The migration strategy is
 - [x] environment receives reactive filtered tower/local-hero/objective lighting.
 - [x] skin visual contract can override aura, trail, particle and glow identity without changing simulation.
 - [x] React battlefield exposes skin visual selections to the Pixi renderer.
-- [x] Chromium proof exercises Gareth Ember skin FX, objective completion, level-up, item equip, ward spawn and authoritative Q combat.
+- [x] Chromium proof exercises Gareth Ember skin FX, objective completion, level-up, item equip, ward spawn, Luxana mesh/root beam and Gareth authoritative Q combat.
 - [x] skeletal animation driver contract prepared for current sprite sheets and a future licensed `spine-pixi-v8` adapter.
 - [x] CI guards prevent visual runtime imports from `src/game/` and guard legacy catalog coverage.
 - [x] package lock records the Pixi filter dependency.
