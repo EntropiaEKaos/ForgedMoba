@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 
 const manifestPath = resolve('public/assets/art/v2/manifest.json');
 const uiManifestPath = resolve('public/assets/ui/v2/manifest.json');
+const visualCatalogPath = resolve('public/assets/visual/v2.3/legacy-capabilities.json');
 if (!existsSync(manifestPath)) {
   console.error('[art-assets] missing manifest:', manifestPath);
   process.exit(1);
@@ -14,6 +15,11 @@ if (!existsSync(uiManifestPath)) {
   process.exit(1);
 }
 const uiManifest = JSON.parse(readFileSync(uiManifestPath, 'utf8'));
+if (!existsSync(visualCatalogPath)) {
+  console.error('[art-assets] missing Visual 2.3 legacy capability catalog:', visualCatalogPath);
+  process.exit(1);
+}
+const visualCatalog = JSON.parse(readFileSync(visualCatalogPath, 'utf8'));
 const errors = [];
 const refs = [
   ['terrain.map', manifest?.terrain?.map],
@@ -81,6 +87,15 @@ for (const id of requiredUiItems) {
 
 if (totalBytes > 6_000_000) errors.push('art pack exceeds 6MB source budget');
 if (uiBytes > 2_000_000) errors.push('UI pack exceeds 2MB source budget');
+
+if (visualCatalog?.version !== 3) errors.push('Visual 2.3 capability catalog must use version 3');
+if (!String(visualCatalog?.id ?? '').startsWith('forged-visual-capabilities-')) errors.push('Visual 2.3 capability catalog id is invalid');
+if ((visualCatalog?.counts?.heroes ?? 0) < 40) errors.push('Visual 2.3 capability catalog lost legacy hero coverage');
+if ((visualCatalog?.counts?.items ?? 0) < 30) errors.push('Visual 2.3 capability catalog lost legacy item coverage');
+if ((visualCatalog?.counts?.runes ?? 0) < 10) errors.push('Visual 2.3 capability catalog lost rune coverage');
+if ((visualCatalog?.counts?.summoners ?? 0) < 8) errors.push('Visual 2.3 capability catalog lost summoner coverage');
+if ((visualCatalog?.counts?.skins ?? 0) < 15) errors.push('Visual 2.3 capability catalog lost skin coverage');
+if ((visualCatalog?.counts?.abilityKeys ?? 0) < 150) errors.push('Visual 2.3 capability catalog lost legacy ability-key coverage');
 if (!Array.isArray(manifest?.heroes) || manifest.heroes.length < 2) {
   errors.push('manifest must provide at least the authoritative Gareth/Luxana coverage');
 }
@@ -96,5 +111,8 @@ console.log(
   ' · heroes=' + manifest.heroes.length +
   ' · world-bytes=' + totalBytes +
   ' · ui=' + uiManifest.id +
-  ' · ui-bytes=' + uiBytes,
+  ' · ui-bytes=' + uiBytes +
+  ' · visual-catalog=' + visualCatalog.id +
+  ' · legacy-heroes=' + visualCatalog.counts.heroes +
+  ' · ability-keys=' + visualCatalog.counts.abilityKeys,
 );
