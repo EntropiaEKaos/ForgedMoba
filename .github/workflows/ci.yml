@@ -53,6 +53,9 @@ jobs:
       - name: Visual authority boundaries
         run: npm run lint:visual-boundaries
 
+      - name: Production art assets
+        run: npm run lint:art-assets
+
       - name: TypeScript
         run: npm run typecheck
 
