@@ -11,6 +11,7 @@ const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
 const errors = [];
 const refs = [
   ['terrain.map', manifest?.terrain?.map],
+  ['world.source', manifest?.world?.source],
   ...((manifest?.heroes ?? []).map((hero) => ['hero:' + hero.heroId, hero.source])),
 ];
 
