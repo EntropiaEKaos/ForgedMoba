@@ -145,6 +145,19 @@ export function VisualProofScreen() {
       });
     }, 2860);
 
+    const luxanaTimer = setTimeout(() => {
+      setState((current) => {
+        const next = structuredClone(current);
+        const target = Object.values(next.entities).find((entity) => entity.ownerPlayerId === 'red-1');
+        if (target) {
+          stepSimulation(next, [
+            { type: 'cast', playerId: 'blue-2', seq: 1, tick: next.tick, slot: 'Q', x: target.x, y: target.y },
+          ]);
+        }
+        return next;
+      });
+    }, 2860);
+
     const combatTimer = setTimeout(() => {
       setState((current) => {
         const next = structuredClone(current);
@@ -153,12 +166,13 @@ export function VisualProofScreen() {
         ]);
         return next;
       });
-    }, 3040);
+    }, 3060);
 
     return () => {
       clearTimeout(objectiveTimer);
       clearTimeout(progressionTimer);
       clearTimeout(wardTimer);
+      clearTimeout(luxanaTimer);
       clearTimeout(combatTimer);
     };
   }, [initialState]);
