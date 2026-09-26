@@ -84,3 +84,31 @@ Certification requires:
 3. PR merge-ref CI green;
 4. protected squash merge with expected HEAD SHA;
 5. new main SHA post-merge CI green.
+
+
+## Certified release
+
+Visual 2.2 was merged through PR #20 and certified on:
+
+`main @ cce084c538b3c7931a6187f4915ffaf0722fb042`
+
+Certification sequence:
+
+- exact branch HEAD CI: green;
+- branch Chromium proof: green and visually inspected;
+- PR merge-ref CI: green;
+- protected squash merge with expected HEAD SHA;
+- post-merge main CI: green;
+- authoritative 5v5 load probe: green.
+
+The archived proof confirms:
+
+- real Gareth Q artwork;
+- production item artwork visible in inventory;
+- refined top scoreboard;
+- reduced cinematic objective banner;
+- refined minimap frame;
+- local-hero Pixi ground sigil;
+- Visual 2.1 world atlas preserved.
+
+Visual 2.2 keeps the Premium HUD as the minimum baseline and advances the next visual milestone to Visual 2.3: production skins, optimized textures and broader hero coverage.
