@@ -116,3 +116,40 @@ Once 2.1 is certified, the next production art layer should focus on:
 - richer spell materials and battlefield lighting.
 
 The renderer architecture does not need to change again for those additions; they extend the same manifest/registry contract.
+
+
+## Visual 2.1.1 — Premium HUD & Battlefield Presence
+
+This follow-up keeps the complete Visual 2.1 world atlas and upgrades the battlefield presentation around it.
+
+### Premium HUD
+
+The combat surface now includes:
+
+- competitive top scoreboard with team/objective score;
+- blue/red team portrait strips;
+- large local hero portrait and combat status panel;
+- authoritative HP, gold and CS;
+- Q/W/E/R/ward command dock;
+- cooldown and ready-state feedback;
+- six-slot inventory display;
+- tactical Rift minimap driven by authoritative entity coordinates;
+- compact shop drawer and network diagnostics;
+- integrated combat-event feed;
+- viewport corner chrome and cinematic vignette.
+
+### Pixi presence
+
+The battlefield renderer now adds presentation-only:
+
+- blue/red/local hero halos;
+- animated local selection arcs;
+- epic-objective aura;
+- tower base glow;
+- quality-safe aura pulse.
+
+Visual 2.1.1 does not modify authoritative positions, hitboxes, targeting, vision, damage, movement or objective logic.
+
+### Visual proof
+
+The existing deterministic Chromium proof route must show the premium HUD together with the Visual 2.1 world atlas before merge.
