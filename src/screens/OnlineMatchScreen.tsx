@@ -4,6 +4,7 @@ import type { SimEntity, SimulationState } from '../simulation/types';
 import { CURRENT_AUTHORITATIVE_CONTENT } from '../shared/authoritativeContent';
 import { PixiBattlefield } from '../visual/PixiBattlefield.tsx';
 import { CinematicHud } from '../visual/CinematicHud.tsx';
+import { ScoreboardOverlay } from '../visual/ScoreboardOverlay.tsx';
 
 function localEntity(state: SimulationState | null, playerId: string | undefined): SimEntity | null {
   if (!state || !playerId) return null;
@@ -42,6 +43,10 @@ export function OnlineMatchScreen() {
   return (
     <div className="fixed inset-0 bg-[#07110f] text-[#d8e4e8] overflow-hidden">
       <PixiBattlefield localPlayerId={user?.id} />
+      <ScoreboardOverlay
+        state={conn.predictedState ?? authoritativeSnapshot?.state ?? null}
+        localPlayerId={user?.id}
+      />
       <CinematicHud
         matchId={match.matchId}
         mode={match.mode}
