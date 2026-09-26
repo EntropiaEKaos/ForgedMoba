@@ -1,21 +1,24 @@
 import {
   Container,
   Graphics,
+  MeshSimple,
   Particle,
   ParticleContainer,
   Rectangle,
   Text,
   Texture,
 } from 'pixi.js';
+import { AdvancedBloomFilter } from 'pixi-filters/advanced-bloom';
+import { GlowFilter } from 'pixi-filters/glow';
 import type { SimulationState } from '../simulation/types.ts';
 import {
-  captureVisualProbe,
-  deriveCombatFx,
   fxSeed,
   nextVisualRandom,
   type CombatFxEvent,
-  type VisualStateProbe,
 } from './fxModel.ts';
+import { profileForEvent } from './capabilityRegistry.ts';
+import { VisualEventBus } from './visualEventBus.ts';
+import { advanceEnergyPulse, createEnergyPulseFilter } from './energyPulseFilter.ts';
 import { VISUAL_QUALITY, type VisualQuality } from './quality.ts';
 
 interface LiveParticle {
@@ -23,6 +26,12 @@ interface LiveParticle {
   vx: number;
   vy: number;
   gravity: number;
+  lifeMs: number;
+  maxLifeMs: number;
+}
+
+interface LiveBeam {
+  mesh: MeshSimple;
   lifeMs: number;
   maxLifeMs: number;
 }
@@ -50,19 +59,11 @@ function eventKey(event: CombatFxEvent): string {
     event.type,
     event.tick,
     'entityId' in event ? event.entityId : event.team,
+    'slot' in event ? event.slot : '',
+    'itemId' in event ? event.itemId : '',
+    'targetId' in event ? event.targetId : '',
+    'status' in event ? event.status : '',
   ].join(':');
-}
-
-function eventColor(event: CombatFxEvent): number {
-  if (event.type === 'q-cast') return event.heroId === 'gareth' ? 0xffc34d : 0x71d8ff;
-  if (event.type === 'status-impact') {
-    if (event.status === 'root') return 0x9a70ff;
-    if (event.status === 'stun') return 0xffe45e;
-    return 0x63b6ff;
-  }
-  if (event.type === 'objective') return 0xc077ff;
-  if (event.type === 'death') return event.kind === 'objective' ? 0xc077ff : 0xff665d;
-  return 0xffefdb;
 }
 
 export class CombatFxRuntime {
@@ -75,27 +76,42 @@ export class CombatFxRuntime {
     },
     boundsArea: new Rectangle(0, 0, 100_000, 100_000),
   });
+  readonly meshes = new Container();
   readonly overlay = new Container();
 
+  private readonly eventBus = new VisualEventBus();
+  private readonly glowFilter = new GlowFilter({
+    distance: 12,
+    outerStrength: 1.7,
+    innerStrength: 0.25,
+    color: 0xffffff,
+    quality: 0.25,
+  });
+  private readonly bloomFilter = new AdvancedBloomFilter({
+    threshold: 0.42,
+    bloomScale: 0.72,
+    brightness: 1.04,
+    blur: 4,
+    quality: 2,
+  });
+  private readonly energyFilter = createEnergyPulseFilter();
   private liveParticles: LiveParticle[] = [];
+  private beams: LiveBeam[] = [];
   private rings: LiveRing[] = [];
   private labels: LiveLabel[] = [];
-  private lastProbe: VisualStateProbe | null = null;
   private seen = new Set<string>();
   private seenOrder: string[] = [];
   private shakeEnergy = 0;
   private shakePhase = 0;
   private flashUntil = new Map<number, number>();
 
-  observe(state: SimulationState, quality: VisualQuality): void {
-    const probe = captureVisualProbe(state);
-    if (this.lastProbe && probe.tick < this.lastProbe.tick) {
-      this.lastProbe = probe;
-      return;
-    }
+  constructor() {
+    this.overlay.filters = [this.glowFilter];
+    this.meshes.filters = [this.bloomFilter, this.energyFilter];
+  }
 
-    const events = deriveCombatFx(this.lastProbe, probe);
-    this.lastProbe = probe;
+  observe(state: SimulationState, quality: VisualQuality): void {
+    const events = this.eventBus.observe(state);
     for (const event of events) {
       const key = eventKey(event);
       if (this.seen.has(key)) continue;
@@ -112,6 +128,11 @@ export class CombatFxRuntime {
   update(deltaMs: number, quality: VisualQuality): void {
     const dt = Math.max(0, Math.min(50, deltaMs)) / 1000;
     const particleBudget = VISUAL_QUALITY[quality].particles;
+    const highFx = quality === 'high' || quality === 'ultra';
+    this.glowFilter.enabled = highFx;
+    this.bloomFilter.enabled = highFx;
+    this.energyFilter.enabled = quality !== 'low';
+    advanceEnergyPulse(this.energyFilter, deltaMs, quality === 'ultra' ? 1.25 : quality === 'high' ? 1 : 0.65);
 
     for (let i = this.liveParticles.length - 1; i >= 0; i -= 1) {
       const live = this.liveParticles[i];
@@ -134,6 +155,19 @@ export class CombatFxRuntime {
         const live = this.liveParticles.shift();
         if (live) this.particles.removeParticle(live.particle);
       }
+    }
+
+    for (let i = this.beams.length - 1; i >= 0; i -= 1) {
+      const beam = this.beams[i];
+      beam.lifeMs -= deltaMs;
+      if (beam.lifeMs <= 0) {
+        this.meshes.removeChild(beam.mesh);
+        beam.mesh.destroy();
+        this.beams.splice(i, 1);
+        continue;
+      }
+      const ratio = Math.max(0, beam.lifeMs / beam.maxLifeMs);
+      beam.mesh.alpha = ratio * ratio;
     }
 
     for (let i = this.rings.length - 1; i >= 0; i -= 1) {
@@ -190,61 +224,102 @@ export class CombatFxRuntime {
   destroy(): void {
     for (const live of this.liveParticles) this.particles.removeParticle(live.particle);
     this.liveParticles = [];
+    this.beams = [];
     this.rings = [];
     this.labels = [];
+    this.eventBus.reset();
     this.particles.destroy();
+    this.meshes.destroy({ children: true });
     this.overlay.destroy({ children: true });
   }
 
   private consume(event: CombatFxEvent, quality: VisualQuality): void {
-    const color = eventColor(event);
+    const profile = profileForEvent(event);
+    const color = profile.primary;
     const multiplier =
-      quality === 'low' ? 0.55 :
+      (quality === 'low' ? 0.55 :
       quality === 'medium' ? 0.8 :
       quality === 'ultra' ? 1.45 :
-      1;
+      1) * profile.particleScale;
 
     if (event.type === 'damage') {
       this.flashUntil.set(event.entityId, performance.now() + 115);
       this.spawnBurst(event.x, event.y, color, Math.ceil(8 * multiplier), 115, 520, fxSeed(event));
-      this.spawnDamageLabel(event.x, event.y - 20, event.amount);
+      this.spawnDamageLabel(event.x, event.y - 20, event.amount, '-', 0xffe4d0);
       this.spawnRing(event.x, event.y, 8, 32, 260, color);
-      this.shakeEnergy = Math.min(10, this.shakeEnergy + Math.min(3.2, event.amount / 90));
+      this.shakeEnergy = Math.min(10, this.shakeEnergy + Math.min(3.2, event.amount / 90) * profile.shake);
+      return;
+    }
+
+    if (event.type === 'heal') {
+      this.spawnBurst(event.x, event.y, color, Math.ceil(10 * multiplier), 80, 620, fxSeed(event));
+      this.spawnDamageLabel(event.x, event.y - 18, event.amount, '+', 0x8ff0ae);
+      this.spawnRing(event.x, event.y, 12, 42, 380, profile.secondary);
+      return;
+    }
+
+    if (event.type === 'basic-attack') {
+      this.spawnBeam(event.sourceX, event.sourceY, event.x, event.y, profile.trailWidth * 0.42, color, 150);
+      this.spawnTrail(event.sourceX, event.sourceY, event.x, event.y, profile.secondary, Math.ceil(5 * multiplier), fxSeed(event));
       return;
     }
 
     if (event.type === 'q-cast') {
-      this.spawnBurst(event.x, event.y, color, Math.ceil(16 * multiplier), 145, 680, fxSeed(event));
-      this.spawnRing(event.x, event.y, 18, event.heroId === 'gareth' ? 95 : 125, 420, color);
-      this.shakeEnergy = Math.min(10, this.shakeEnergy + 1.3);
+      const radius = event.heroId === 'gareth' ? 108 : 145;
+      this.spawnBurst(event.x, event.y, color, Math.ceil(20 * multiplier), 165, 720, fxSeed(event));
+      this.spawnRing(event.x, event.y, 18, radius, 460, color);
+      this.spawnRing(event.x, event.y, 32, radius * 0.72, 620, profile.secondary);
+      this.shakeEnergy = Math.min(10, this.shakeEnergy + 1.6 * profile.shake);
+      return;
+    }
+
+    if (event.type === 'ability-cast') {
+      const scale = event.slot === 'R' ? 1.7 : event.slot === 'E' ? 1.25 : 1;
+      this.spawnBurst(event.x, event.y, color, Math.ceil(18 * multiplier * scale), 150 * scale, 760, fxSeed(event));
+      this.spawnRing(event.x, event.y, 20, 105 * scale, 520, color);
+      this.shakeEnergy = Math.min(14, this.shakeEnergy + scale * profile.shake);
       return;
     }
 
     if (event.type === 'status-impact') {
-      this.spawnTrail(
-        event.sourceX,
-        event.sourceY,
-        event.x,
-        event.y,
-        color,
-        Math.ceil(13 * multiplier),
-        fxSeed(event),
-      );
-      this.spawnBurst(event.x, event.y, color, Math.ceil(12 * multiplier), 85, 700, fxSeed(event));
-      this.spawnRing(event.x, event.y, 12, 58, 500, color);
+      this.spawnBeam(event.sourceX, event.sourceY, event.x, event.y, profile.trailWidth, profile.secondary, 330);
+      this.spawnTrail(event.sourceX, event.sourceY, event.x, event.y, color, Math.ceil(15 * multiplier), fxSeed(event));
+      this.spawnBurst(event.x, event.y, profile.secondary, Math.ceil(14 * multiplier), 95, 720, fxSeed(event));
+      this.spawnRing(event.x, event.y, 12, 64, 520, color);
+      return;
+    }
+
+    if (event.type === 'level-up') {
+      this.spawnPillar(event.x, event.y, 170, 24, color, 720);
+      this.spawnBurst(event.x, event.y, profile.secondary, Math.ceil(30 * multiplier), 130, 880, fxSeed(event));
+      this.spawnRing(event.x, event.y, 24, 135, 780, color);
+      return;
+    }
+
+    if (event.type === 'item-equip') {
+      this.spawnBurst(event.x, event.y, profile.secondary, Math.ceil(12 * multiplier), 90, 520, fxSeed(event));
+      this.spawnRing(event.x, event.y, 10, 52, 420, color);
+      return;
+    }
+
+    if (event.type === 'ward-spawn') {
+      this.spawnPillar(event.x, event.y, 90, 10, color, 520);
+      this.spawnRing(event.x, event.y, 8, 78, 640, profile.secondary);
+      this.spawnBurst(event.x, event.y, color, Math.ceil(16 * multiplier), 72, 680, fxSeed(event));
       return;
     }
 
     if (event.type === 'death') {
-      this.spawnBurst(event.x, event.y, color, Math.ceil(28 * multiplier), 210, 900, fxSeed(event));
-      this.spawnRing(event.x, event.y, 25, event.kind === 'objective' ? 210 : 120, 760, color);
-      this.shakeEnergy = Math.min(14, this.shakeEnergy + (event.kind === 'objective' ? 7 : 3.2));
+      this.spawnBurst(event.x, event.y, color, Math.ceil(30 * multiplier), 220, 940, fxSeed(event));
+      this.spawnRing(event.x, event.y, 25, event.kind === 'objective' ? 230 : 130, 800, color);
+      this.shakeEnergy = Math.min(14, this.shakeEnergy + (event.kind === 'objective' ? 7 : 3.2) * profile.shake);
       return;
     }
 
-    this.spawnBurst(event.x, event.y, color, Math.ceil(48 * multiplier), 260, 1250, fxSeed(event));
-    this.spawnRing(event.x, event.y, 35, 260, 1100, color);
-    this.shakeEnergy = Math.min(16, this.shakeEnergy + 8);
+    this.spawnBurst(event.x, event.y, color, Math.ceil(52 * multiplier), 280, 1320, fxSeed(event));
+    this.spawnRing(event.x, event.y, 35, 280, 1180, color);
+    this.spawnPillar(event.x, event.y, 220, 34, profile.secondary, 980);
+    this.shakeEnergy = Math.min(16, this.shakeEnergy + 8 * profile.shake);
   }
 
   private spawnBurst(
@@ -329,6 +404,51 @@ export class CombatFxRuntime {
     }
   }
 
+  private spawnBeam(
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+    width: number,
+    color: number,
+    lifeMs: number,
+  ): void {
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const length = Math.max(0.001, Math.hypot(dx, dy));
+    const nx = -dy / length * width * 0.5;
+    const ny = dx / length * width * 0.5;
+    const mesh = new MeshSimple({
+      texture: Texture.WHITE,
+      vertices: new Float32Array([
+        x1 + nx, y1 + ny,
+        x1 - nx, y1 - ny,
+        x2 - nx, y2 - ny,
+        x2 + nx, y2 + ny,
+      ]),
+      uvs: new Float32Array([0, 0, 0, 1, 1, 1, 1, 0]),
+      indices: new Uint32Array([0, 1, 2, 0, 2, 3]),
+    });
+    mesh.tint = color;
+    mesh.alpha = 0.92;
+    mesh.blendMode = 'add';
+    this.meshes.addChild(mesh);
+    this.beams.push({ mesh, lifeMs, maxLifeMs: lifeMs });
+  }
+
+  private spawnPillar(
+    x: number,
+    y: number,
+    height: number,
+    width: number,
+    color: number,
+    lifeMs: number,
+  ): void {
+    this.spawnBeam(x, y + 18, x, y - height, width, color, lifeMs);
+    this.spawnBeam(x - width, y + 10, x - width * 0.25, y - height * 0.72, width * 0.22, 0xffffff, lifeMs * 0.82);
+    this.spawnBeam(x + width, y + 10, x + width * 0.25, y - height * 0.72, width * 0.22, 0xffffff, lifeMs * 0.82);
+  }
+
   private spawnRing(
     x: number,
     y: number,
@@ -351,11 +471,11 @@ export class CombatFxRuntime {
     });
   }
 
-  private spawnDamageLabel(x: number, y: number, amount: number): void {
+  private spawnDamageLabel(x: number, y: number, amount: number, prefix = '-', fill = 0xffe4d0): void {
     const text = new Text({
-      text: '-' + Math.round(amount),
+      text: prefix + Math.round(amount),
       style: {
-        fill: 0xffe4d0,
+        fill,
         fontSize: 18,
         fontFamily: 'monospace',
         fontWeight: '800',
