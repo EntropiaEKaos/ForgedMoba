@@ -190,15 +190,24 @@ export function CinematicHud({
         {banner && !result && (
           <motion.div
             key={activeEvent?.key}
-            className="absolute top-[12%] left-1/2 -translate-x-1/2"
+            className="absolute top-[9%] left-1/2 -translate-x-1/2"
             initial={{ opacity: 0, y: -34, scale: 0.86 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -22, scale: 1.06 }}
             transition={{ type: 'spring', stiffness: 210, damping: 19 }}
           >
-            <div className={'min-w-80 border-y-2 bg-[#071015]/92 px-10 py-4 text-center backdrop-blur-sm ' + toneClass[banner.tone]}>
-              <div className="font-pixel text-[8px] tracking-[0.35em] opacity-70">{banner.eyebrow}</div>
-              <div className="mt-2 font-pixel text-[14px]">{banner.title}</div>
+            <div
+              className={'relative min-w-72 overflow-hidden border-y bg-[linear-gradient(90deg,transparent,rgba(7,16,21,.94)_14%,rgba(7,16,21,.94)_86%,transparent)] px-9 py-3 text-center backdrop-blur-md ' + toneClass[banner.tone]}
+              style={{ clipPath: 'polygon(5% 0,95% 0,100% 50%,95% 100%,5% 100%,0 50%)' }}
+            >
+              <motion.div
+                className="absolute inset-y-0 -left-12 w-10 rotate-12 bg-white/12 blur-md"
+                animate={{ x: [0, 420] }}
+                transition={{ duration: 1.2 }}
+              />
+              <div className="absolute inset-x-12 top-0 h-px bg-gradient-to-r from-transparent via-white/55 to-transparent" />
+              <div className="font-pixel text-[7px] tracking-[0.34em] opacity-65">{banner.eyebrow}</div>
+              <div className="mt-1.5 font-pixel text-[12px] drop-shadow-[0_0_16px_rgba(255,255,255,.16)]">{banner.title}</div>
             </div>
           </motion.div>
         )}
