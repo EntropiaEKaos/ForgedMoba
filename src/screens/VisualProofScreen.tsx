@@ -32,6 +32,9 @@ function buildProofState(): SimulationState {
       entity.level = entity.team === 0 ? 6 : 5;
       entity.gold = entity.team === 0 ? 1320 : 1180;
       entity.cs = entity.team === 0 ? 42 : 37;
+      if (entity.ownerPlayerId === 'blue-1') {
+        entity.inventory = ['longsword', 'ruby', 'boots'];
+      }
     }
   }
   return state;
@@ -138,7 +141,7 @@ export function VisualProofScreen() {
       />
 
       <div className="pointer-events-none absolute left-1/2 top-[58px] z-20 -translate-x-1/2 rounded-full border border-[#6b5a30] bg-[#090e12]/72 px-4 py-1.5 text-[9px] uppercase tracking-[.24em] text-[#d5c179] backdrop-blur-sm">
-        Visual 2.1 · PixiJS Ultra · World Assets
+        Visual 2.2 · PixiJS Ultra · HUD Art Pass
       </div>
     </div>
   );
