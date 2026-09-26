@@ -196,7 +196,7 @@ The existing game is a feature-rich offline prototype. The migration strategy is
 - [x] branch CI + PR CI + post-merge main CI green on main @ 79db8ce62c9c82550242a0d538ee86730402f1cb.
 - [x] Chromium visual proof captured in branch and PR CI as `visual-proof-cinematic`.
 
-## Visual 2.0 — current branch
+## Visual 2.0 — certified and merged
 
 - [x] versioned production art manifest under `public/assets/art/v2`.
 - [x] validated runtime art manifest schema.
@@ -212,11 +212,28 @@ The existing game is a feature-rich offline prototype. The migration strategy is
 - [x] premium MOBA HUD with team frames, minimap, command dock, inventory, shop and event feed.
 - [x] network diagnostics moved behind F8 instead of permanently occupying the battlefield.
 - [x] W/E/R are explicitly shown as locked until the authoritative core implements them.
+- [x] branch CI + PR CI + post-merge main CI green on main @ ec1992c290158bd270dce14f0e20b567b3b7f22e.
+- [x] real Chromium proof inspected with the Premium HUD and production art pack.
+
+## Visual 2.1 — current branch
+
+- [x] art pack advanced to `forged-art-v2.1.0`.
+- [x] single batched world atlas for battlefield entities.
+- [x] blue/red minion production sprites.
+- [x] blue/red tower production sprites.
+- [x] jungle monster production sprite.
+- [x] epic objective production sprite.
+- [x] blue/red ward production sprites.
+- [x] world atlas is manifest-driven and validated by CI.
+- [x] Pixi renderer selects world frames from authoritative entity kind/team.
+- [x] objective and ward visual pulse without touching simulation.
+- [x] world assets participate in hit-flash presentation.
+- [x] Graphics primitives remain as safe fallback.
 - [ ] branch CI + PR CI + post-merge main CI certification.
-- [ ] inspect and archive the new real Chromium screenshot.
+- [ ] inspect the real Chromium proof and tune scale/readability if needed.
 
 ## Visual milestones
-- [ ] 2.1: production skins, structures/minions and optimized texture export.
+- [ ] 2.2: production skins, optimized texture export and expanded hero coverage.
 - [ ] 2.2: full hero roster art coverage and animation authoring workflow.
 
 ## Multiplayer milestones
