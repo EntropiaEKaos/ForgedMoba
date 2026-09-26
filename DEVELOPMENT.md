@@ -266,9 +266,35 @@ The existing game is a feature-rich offline prototype. The migration strategy is
 - [x] branch CI + PR CI + post-merge main CI green on main @ cce084c538b3c7931a6187f4915ffaf0722fb042.
 - [x] Visual 2.2 Chromium proof inspected and archived before merge.
 
+## Visual 2.3 — current branch
+
+- [x] full legacy visual capability catalog indexed without importing the legacy engine into the authoritative renderer.
+- [x] catalog covers 48 heroes, 39 items, 15 runes, 8 summoners, 20 skins and 235 ability/effect keys.
+- [x] visual authority contract explicitly separates catalog coverage from server-authoritative gameplay support.
+- [x] Visual Event Bus converts authoritative state deltas into reusable presentation events.
+- [x] event coverage expanded to damage, healing, basic attacks, Q, future authoritative W/E/R, status impact, level-up, item equip, ward spawn, deaths and objectives.
+- [x] semantic material registry for steel/radiant/arcane/void/fire/frost/storm/nature/blood/shadow families.
+- [x] Pixi ParticleContainer remains the high-volume GPU particle path.
+- [x] MeshSimple beam/ribbon layer added for projectiles, status links and light pillars.
+- [x] `pixi-filters@6.1.5` integrated with Glow and AdvancedBloom passes.
+- [x] custom Pixi v8 GlProgram energy-pulse shader integrated into mesh FX.
+- [x] quality presets gate expensive filter passes.
+- [x] environment receives reactive filtered tower/local-hero/objective lighting.
+- [x] skin visual contract can override aura, trail, particle and glow identity without changing simulation.
+- [x] React battlefield exposes skin visual selections to the Pixi renderer.
+- [x] Chromium proof exercises Gareth Ember skin FX, objective completion, level-up, item equip, ward spawn and authoritative Q combat.
+- [x] skeletal animation driver contract prepared for current sprite sheets and a future licensed `spine-pixi-v8` adapter.
+- [x] CI guards prevent visual runtime imports from `src/game/` and guard legacy catalog coverage.
+- [x] package lock records the Pixi filter dependency.
+- [ ] exact branch HEAD CI green and real Chromium proof inspected.
+- [ ] PR merge-ref CI green.
+- [ ] protected merge and post-merge main CI green.
+
 ## Visual milestones
-- [ ] 2.3: production skins, optimized texture export and expanded hero coverage.
-- [ ] 2.3: full hero roster art coverage and animation authoring workflow.
+- [ ] 2.4: production skin texture variants and optimized GPU texture export.
+- [ ] 2.4: broader production hero art coverage using the Visual 2.3 animation/material contracts.
+- [ ] 2.4: optional licensed Spine adapter only if a Spine authoring pipeline is adopted.
+
 
 ## Multiplayer milestones
 - [ ] 1.0: production-ready authoritative 5v5 match architecture.
