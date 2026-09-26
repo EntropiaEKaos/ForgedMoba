@@ -232,7 +232,7 @@ The existing game is a feature-rich offline prototype. The migration strategy is
 - [x] merged into main through PR #17 at 4c4651a11eb5f509a440b488d8900bf5c491a212.
 - [x] world atlas preserved as the baseline for follow-up visual polish.
 
-## Visual 2.1.1 — current branch
+## Visual 2.1.1 — certified and merged
 
 - [x] premium top scoreboard and team portrait strips.
 - [x] large local-hero combat panel.
@@ -243,11 +243,11 @@ The existing game is a feature-rich offline prototype. The migration strategy is
 - [x] Pixi hero halos and animated local selection arcs.
 - [x] epic-objective aura and tower base glow.
 - [x] all effects remain presentation-only.
-- [ ] branch CI + PR CI + post-merge main certification.
-- [ ] inspect new Chromium visual proof before merge.
+- [x] branch CI + PR CI + post-merge main CI green on main @ dea5087e8e1fe09a4eee8b145e8949372b5a00f7.
+- [x] real Chromium visual proof inspected before merge; premium HUD and Visual 2.1 world atlas coexist correctly.
 
 ## Visual milestones
-- [ ] 2.2: production skins, optimized texture export and expanded hero coverage.
+- [ ] 2.2: production skins, optimized texture export, richer ability icons/materials and expanded hero coverage.
 - [ ] 2.2: full hero roster art coverage and animation authoring workflow.
 
 ## Multiplayer milestones
