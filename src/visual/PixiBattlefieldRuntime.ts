@@ -30,6 +30,7 @@ interface ActiveCameraCue extends CinematicCameraCue {
 
 interface EntityNode {
   root: Container;
+  aura: Graphics;
   shadow: Graphics;
   selection: Graphics;
   art: Sprite;
@@ -371,6 +372,8 @@ export class PixiBattlefieldRuntime {
 
   private createNode(entity: SimEntity, isLocal: boolean): EntityNode {
     const root = new Container();
+    const aura = new Graphics();
+    aura.blendMode = 'add';
     const shadow = new Graphics();
     const selection = new Graphics();
     const art = new Sprite();
@@ -388,10 +391,11 @@ export class PixiBattlefieldRuntime {
     });
     label.anchor.set(0.5, 1);
 
-    root.addChild(shadow, selection, art, body, health, label);
+    root.addChild(aura, shadow, selection, art, body, health, label);
     this.entities.addChild(root);
     const node: EntityNode = {
       root,
+      aura,
       shadow,
       selection,
       art,
@@ -421,6 +425,29 @@ export class PixiBattlefieldRuntime {
     const worldKey = worldArtKey(entity);
     const worldArt = this.artAssets.worldDefinition(worldKey);
     const shadowScale = heroArt?.shadowScale ?? worldArt?.shadowScale ?? 1;
+
+    node.aura.clear();
+    if (entity.kind === 'hero') {
+      const auraColor = isLocal ? 0xffdf72 : entity.team === 0 ? 0x4cbcff : 0xff6262;
+      node.aura
+        .circle(0, 3, radius * (isLocal ? 2.65 : 2.15))
+        .fill({ color: auraColor, alpha: isLocal ? 0.12 : 0.065 })
+        .circle(0, 3, radius * 1.42)
+        .stroke({ color: auraColor, alpha: isLocal ? 0.5 : 0.25, width: isLocal ? 3 : 2 });
+    } else if (entity.kind === 'objective') {
+      node.aura
+        .circle(0, 0, radius * 3.4)
+        .fill({ color: 0xb06cff, alpha: 0.09 })
+        .circle(0, 0, radius * 2.05)
+        .stroke({ color: 0xd9a2ff, alpha: 0.44, width: 4 });
+    } else if (entity.kind === 'tower') {
+      const auraColor = entity.team === 0 ? 0x4aa8ff : 0xff5f5f;
+      node.aura
+        .circle(0, radius * 0.75, radius * 1.65)
+        .fill({ color: auraColor, alpha: 0.07 })
+        .ellipse(0, radius * 1.05, radius * 1.4, radius * 0.5)
+        .stroke({ color: auraColor, alpha: 0.32, width: 3 });
+    }
 
     node.shadow.clear()
       .ellipse(
@@ -469,8 +496,13 @@ export class PixiBattlefieldRuntime {
 
     node.selection.clear();
     if (isLocal) {
-      node.selection.circle(0, 0, radius + 8)
-        .stroke({ color: 0xffef9a, alpha: 0.9, width: 3 });
+      node.selection
+        .circle(0, 1, radius + 10)
+        .stroke({ color: 0xffef9a, alpha: 0.78, width: 2.5 })
+        .arc(0, 1, radius + 15, -0.7, 0.55)
+        .stroke({ color: 0xffffff, alpha: 0.92, width: 3.5 })
+        .arc(0, 1, radius + 15, 2.45, 3.7)
+        .stroke({ color: 0xffd95f, alpha: 0.86, width: 3.5 });
     }
 
     node.label.text = entityLabel(entity);
@@ -525,6 +557,16 @@ export class PixiBattlefieldRuntime {
     node.root.position.set(x, y);
 
     const flashing = this.combatFx.isFlashing(entity.id);
+    const auraPulse = 1 + Math.sin(now / 340 + entity.id * 0.73) * 0.035;
+    node.aura.scale.set(auraPulse);
+    node.aura.alpha =
+      entity.kind === 'objective'
+        ? 0.78 + Math.sin(now / 260) * 0.18
+        : entity.kind === 'hero'
+          ? 0.86 + Math.sin(now / 420 + entity.id) * 0.12
+          : 1;
+    node.selection.rotation = now / 2200;
+
     node.body.scale.set(flashing ? 1.08 : 1);
     node.body.alpha = flashing ? 0.72 : 1;
 
