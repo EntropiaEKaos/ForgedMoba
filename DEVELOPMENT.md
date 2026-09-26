@@ -196,8 +196,28 @@ The existing game is a feature-rich offline prototype. The migration strategy is
 - [x] branch CI + PR CI + post-merge main CI green on main @ 79db8ce62c9c82550242a0d538ee86730402f1cb.
 - [x] Chromium visual proof captured in branch and PR CI as `visual-proof-cinematic`.
 
+## Visual 2.0 — current branch
+
+- [x] versioned production art manifest under `public/assets/art/v2`.
+- [x] validated runtime art manifest schema.
+- [x] production Rift terrain asset.
+- [x] Gareth four-pose hero sheet.
+- [x] Luxana four-pose hero sheet.
+- [x] Pixi asset registry and atlas frame extraction.
+- [x] hero `idle/run/attack/cast` presentation states.
+- [x] asset-first renderer with Graphics fallback.
+- [x] production art path/reference/size budget CI gate.
+- [x] nested art-manifest visual tests.
+- [x] deterministic Chromium proof automatically exercises the art pack.
+- [x] premium MOBA HUD with team frames, minimap, command dock, inventory, shop and event feed.
+- [x] network diagnostics moved behind F8 instead of permanently occupying the battlefield.
+- [x] W/E/R are explicitly shown as locked until the authoritative core implements them.
+- [ ] branch CI + PR CI + post-merge main CI certification.
+- [ ] inspect and archive the new real Chromium screenshot.
+
 ## Visual milestones
-- [ ] 2.0: production art pipeline, atlases, animated hero rigs, terrain art and skins.
+- [ ] 2.1: production skins, structures/minions and optimized texture export.
+- [ ] 2.2: full hero roster art coverage and animation authoring workflow.
 
 ## Multiplayer milestones
 - [ ] 1.0: production-ready authoritative 5v5 match architecture.

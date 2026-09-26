@@ -2,6 +2,7 @@ import {
   Application,
   Container,
   Graphics,
+  Sprite,
   Text,
 } from 'pixi.js';
 import type { InterpolatedFrame } from '../network/interpolation.ts';
@@ -19,6 +20,8 @@ import {
   CinematicObserver,
   type CinematicCameraCue,
 } from './cinematicModel.ts';
+import { ArtAssetRegistry } from './art/ArtAssetRegistry.ts';
+import type { HeroArtAnimation } from './art/types.ts';
 
 interface ActiveCameraCue extends CinematicCameraCue {
   startedAt: number;
@@ -29,10 +32,16 @@ interface EntityNode {
   root: Container;
   shadow: Graphics;
   selection: Graphics;
+  art: Sprite;
   body: Graphics;
   health: Graphics;
   label: Text;
   signature: string;
+  pose: HeroArtAnimation;
+  poseStartedAt: number;
+  poseUntil: number;
+  lastAttackCooldown: number;
+  lastQCooldown: number;
 }
 
 export interface BattlefieldRenderInput {
@@ -89,11 +98,13 @@ export class PixiBattlefieldRuntime {
   private readonly canvas: HTMLCanvasElement;
   private readonly app = new Application();
   private readonly world = new Container();
+  private readonly terrainArt = new Sprite();
   private readonly terrain = new Graphics();
   private readonly entities = new Container();
   private readonly environment = new EnvironmentRuntime();
   private readonly combatFx = new CombatFxRuntime();
   private readonly cinematic = new CinematicObserver();
+  private readonly artAssets = new ArtAssetRegistry();
   private readonly nodes = new Map<number, EntityNode>();
   private initialized = false;
   private destroyed = false;
@@ -132,6 +143,14 @@ export class PixiBattlefieldRuntime {
       return;
     }
 
+    await this.artAssets.init();
+    if (this.destroyed) {
+      this.app.destroy();
+      return;
+    }
+    if (this.artAssets.terrain) this.terrainArt.texture = this.artAssets.terrain;
+
+    this.world.addChild(this.terrainArt);
     this.world.addChild(this.terrain);
     this.world.addChild(this.environment.background);
     this.world.addChild(this.environment.ambientParticles);
@@ -253,7 +272,7 @@ export class PixiBattlefieldRuntime {
       const y = interpolation?.y ?? entity.y;
       const hp = interpolation?.hp ?? entity.hp;
       const maxHp = interpolation?.maxHp ?? entity.maxHp;
-      this.updateEntity(entity, x, y, hp, maxHp, isLocal);
+      this.updateEntity(entity, x, y, hp, maxHp, isLocal, now);
     }
 
     for (const [id, node] of this.nodes) {
@@ -306,9 +325,21 @@ export class PixiBattlefieldRuntime {
   }
 
   private ensureTerrain(): void {
-    const key = this.worldWidth + ':' + this.worldHeight + ':' + this.quality;
+    const key = this.worldWidth + ':' + this.worldHeight + ':' + this.quality + ':' + (this.artAssets.version ?? 'fallback');
     if (key === this.terrainKey) return;
     this.terrainKey = key;
+
+    if (this.artAssets.terrain) {
+      this.terrainArt.visible = true;
+      this.terrainArt.texture = this.artAssets.terrain;
+      this.terrainArt.position.set(0, 0);
+      this.terrainArt.width = this.worldWidth;
+      this.terrainArt.height = this.worldHeight;
+      this.terrain.clear();
+      return;
+    }
+
+    this.terrainArt.visible = false;
     const laneY = this.worldHeight * 0.5;
     this.terrain.clear()
       .rect(0, 0, this.worldWidth, this.worldHeight)
@@ -332,6 +363,8 @@ export class PixiBattlefieldRuntime {
     const root = new Container();
     const shadow = new Graphics();
     const selection = new Graphics();
+    const art = new Sprite();
+    art.visible = false;
     const body = new Graphics();
     const health = new Graphics();
     const label = new Text({
@@ -345,9 +378,23 @@ export class PixiBattlefieldRuntime {
     });
     label.anchor.set(0.5, 1);
 
-    root.addChild(shadow, selection, body, health, label);
+    root.addChild(shadow, selection, art, body, health, label);
     this.entities.addChild(root);
-    const node = { root, shadow, selection, body, health, label, signature: '' };
+    const node: EntityNode = {
+      root,
+      shadow,
+      selection,
+      art,
+      body,
+      health,
+      label,
+      signature: '',
+      pose: 'idle',
+      poseStartedAt: 0,
+      poseUntil: 0,
+      lastAttackCooldown: entity.attackCooldownRemaining,
+      lastQCooldown: entity.abilityCooldowns.Q,
+    };
     this.nodes.set(entity.id, node);
     this.rebuildNode(node, entity, isLocal);
     return node;
@@ -358,12 +405,33 @@ export class PixiBattlefieldRuntime {
     const radius = Math.max(7, entity.radius * 1.2);
     node.signature = signature(entity, isLocal);
 
+    const heroArt = entity.kind === 'hero'
+      ? this.artAssets.heroDefinition(entity.heroId)
+      : null;
+    const shadowScale = heroArt?.shadowScale ?? 1;
+
     node.shadow.clear()
-      .ellipse(4, Math.max(4, radius * 0.65), radius * 1.05, Math.max(3, radius * 0.46))
+      .ellipse(
+        4,
+        Math.max(4, radius * 0.65),
+        radius * 1.05 * shadowScale,
+        Math.max(3, radius * 0.46 * shadowScale),
+      )
       .fill({ color: 0x000000, alpha: this.quality === 'low' ? 0.25 : 0.42 });
 
+    node.art.visible = Boolean(heroArt);
+    node.body.visible = !heroArt;
+    if (heroArt) {
+      node.art.anchor.set(heroArt.anchor.x, heroArt.anchor.y);
+      node.art.scale.set(heroArt.scale);
+      const texture = this.artAssets.heroTexture(entity.heroId, 'idle', 0);
+      if (texture) node.art.texture = texture;
+    }
+
     node.body.clear();
-    if (entity.kind === 'tower') {
+    if (heroArt) {
+      // Production art owns the hero silhouette. Graphics remains the safety fallback.
+    } else if (entity.kind === 'tower') {
       node.body.roundRect(-radius, -radius * 1.35, radius * 2, radius * 2.7, radius * 0.28)
         .fill(color)
         .stroke({ color: 0xffffff, alpha: 0.18, width: 2 });
@@ -389,7 +457,34 @@ export class PixiBattlefieldRuntime {
 
     node.label.text = entityLabel(entity);
     node.label.visible = Boolean(node.label.text);
-    node.label.position.set(0, -radius - 10);
+    node.label.position.set(0, heroArt ? -radius * 3.4 : -radius - 10);
+  }
+
+  private resolveHeroPose(node: EntityNode, entity: SimEntity, now: number): HeroArtAnimation {
+    const qCooldown = entity.abilityCooldowns.Q;
+    const attackCooldown = entity.attackCooldownRemaining;
+
+    if (qCooldown > node.lastQCooldown + 1) {
+      node.pose = 'cast';
+      node.poseStartedAt = now;
+      node.poseUntil = now + 420;
+    } else if (attackCooldown > node.lastAttackCooldown + 1) {
+      node.pose = 'attack';
+      node.poseStartedAt = now;
+      node.poseUntil = now + 320;
+    }
+
+    node.lastQCooldown = qCooldown;
+    node.lastAttackCooldown = attackCooldown;
+
+    if (now < node.poseUntil) return node.pose;
+
+    const next: HeroArtAnimation = entity.moveTarget ? 'run' : 'idle';
+    if (node.pose !== next) {
+      node.pose = next;
+      node.poseStartedAt = now;
+    }
+    return node.pose;
   }
 
   private updateEntity(
@@ -399,6 +494,7 @@ export class PixiBattlefieldRuntime {
     hp: number,
     maxHp: number,
     isLocal: boolean,
+    now: number,
   ): void {
     const node = this.nodes.get(entity.id) ?? this.createNode(entity, isLocal);
     if (node.signature !== signature(entity, isLocal)) this.rebuildNode(node, entity, isLocal);
@@ -407,6 +503,27 @@ export class PixiBattlefieldRuntime {
     const flashing = this.combatFx.isFlashing(entity.id);
     node.body.scale.set(flashing ? 1.08 : 1);
     node.body.alpha = flashing ? 0.72 : 1;
+
+    const heroArt = entity.kind === 'hero'
+      ? this.artAssets.heroDefinition(entity.heroId)
+      : null;
+    if (heroArt) {
+      const pose = this.resolveHeroPose(node, entity, now);
+      const texture = this.artAssets.heroTexture(
+        entity.heroId,
+        pose,
+        Math.max(0, now - node.poseStartedAt),
+      );
+      if (texture) node.art.texture = texture;
+      const flashScale = flashing ? 1.045 : 1;
+      node.art.scale.set(heroArt.scale * flashScale);
+      node.art.alpha = flashing ? 0.76 : 1;
+      node.art.visible = true;
+      node.body.visible = false;
+    } else {
+      node.art.visible = false;
+      node.body.visible = true;
+    }
 
     const radius = Math.max(7, entity.radius * 1.2);
     node.health.clear();
