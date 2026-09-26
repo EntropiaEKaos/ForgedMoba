@@ -153,3 +153,29 @@ Visual 2.1.1 does not modify authoritative positions, hitboxes, targeting, visio
 ### Visual proof
 
 The existing deterministic Chromium proof route must show the premium HUD together with the Visual 2.1 world atlas before merge.
+
+
+## Visual 2.1.1 certified release
+
+Premium HUD & Battlefield Presence was merged through PR #18 and certified on:
+
+`main @ dea5087e8e1fe09a4eee8b145e8949372b5a00f7`
+
+Certification sequence:
+
+- feature branch CI: green;
+- PR merge-ref CI: green;
+- post-merge main CI: green;
+- visual authority boundaries: green;
+- production art assets: green;
+- strict TypeScript: green;
+- 100k determinism: green;
+- network suite: green;
+- visual suite: green;
+- production build: green;
+- authoritative server tests: green;
+- realistic 5v5 load probe: green.
+
+A real Chromium screenshot was inspected before promotion and confirmed the Premium HUD renders together with the Visual 2.1 hero/world atlas.
+
+Visual 2.1.1 establishes the premium HUD as the minimum visual baseline for subsequent releases. Later visual work must extend this surface instead of replacing it with a diagnostic/minimal HUD.
