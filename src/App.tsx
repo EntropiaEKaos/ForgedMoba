@@ -14,6 +14,7 @@ import { AdminPanel } from './admin/AdminPanel';
 import { RunesModal } from './screens/RunesModal';
 import { OnlineMatchScreen } from './screens/OnlineMatchScreen';
 import { RankedDraftScreen } from './screens/RankedDraftScreen';
+import { VisualProofScreen } from './screens/VisualProofScreen';
 import { getActiveRules, initializeAdminContent, type AdminContent } from './admin/content';
 
 // ================= BADGE DE STATUS ONLINE =================
@@ -1536,6 +1537,11 @@ export default function App() {
     window.addEventListener('keydown', toggleAdmin);
     return () => window.removeEventListener('keydown', toggleAdmin);
   }, []);
+
+  const visualProof = typeof window !== 'undefined'
+    && new URLSearchParams(window.location.search).get('visual-proof') === 'cinematic';
+
+  if (visualProof) return <VisualProofScreen />;
 
   let screen: ReactNode;
   if (!ready) {
