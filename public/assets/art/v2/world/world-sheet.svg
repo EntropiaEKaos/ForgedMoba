@@ -1,0 +1,98 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="128" viewBox="0 0 1024 128">
+<defs>
+  <linearGradient id="steelB" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#aee9ff"/><stop offset=".5" stop-color="#3f93be"/><stop offset="1" stop-color="#193d58"/></linearGradient>
+  <linearGradient id="steelR" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffd0c9"/><stop offset=".5" stop-color="#c44f4f"/><stop offset="1" stop-color="#5e2027"/></linearGradient>
+  <linearGradient id="stoneB" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#8bd8ff"/><stop offset=".5" stop-color="#306f91"/><stop offset="1" stop-color="#132f43"/></linearGradient>
+  <linearGradient id="stoneR" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ff9690"/><stop offset=".5" stop-color="#90363b"/><stop offset="1" stop-color="#3e161d"/></linearGradient>
+  <linearGradient id="beast" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#d0b066"/><stop offset=".55" stop-color="#75502f"/><stop offset="1" stop-color="#2f241d"/></linearGradient>
+  <radialGradient id="void"><stop stop-color="#f2d4ff"/><stop offset=".35" stop-color="#b867e7"/><stop offset="1" stop-color="#34184c"/></radialGradient>
+  <filter id="glow"><feGaussianBlur stdDeviation="3"/></filter>
+</defs>
+
+<!-- 0 blue minion -->
+<g transform="translate(0 0)">
+  <ellipse cx="64" cy="108" rx="30" ry="8" fill="#000" opacity=".28"/>
+  <path d="M44 72l7-26 26-5 12 25-5 31H47z" fill="url(#steelB)" stroke="#0e2638" stroke-width="5"/>
+  <path d="M49 42q15-17 30 0l-3 16H52z" fill="#245f82" stroke="#0e2638" stroke-width="5"/>
+  <rect x="54" y="48" width="22" height="8" rx="4" fill="#bdefff"/>
+  <circle cx="60" cy="52" r="2.5" fill="#fff"/>
+  <circle cx="70" cy="52" r="2.5" fill="#fff"/>
+  <path d="M47 95l-9 24h18l8-22M77 95l8 24h18L88 95" fill="#24506a" stroke="#0e2638" stroke-width="5"/>
+  <path d="M88 58l24 18-20 9" fill="none" stroke="#8cd8ff" stroke-width="6"/>
+</g>
+
+<!-- 1 red minion -->
+<g transform="translate(128 0)">
+  <ellipse cx="64" cy="108" rx="30" ry="8" fill="#000" opacity=".28"/>
+  <path d="M44 72l7-26 26-5 12 25-5 31H47z" fill="url(#steelR)" stroke="#38151b" stroke-width="5"/>
+  <path d="M49 42q15-17 30 0l-3 16H52z" fill="#762b35" stroke="#38151b" stroke-width="5"/>
+  <rect x="54" y="48" width="22" height="8" rx="4" fill="#ffd4cc"/>
+  <circle cx="60" cy="52" r="2.5" fill="#fff"/>
+  <circle cx="70" cy="52" r="2.5" fill="#fff"/>
+  <path d="M47 95l-9 24h18l8-22M77 95l8 24h18L88 95" fill="#6a2830" stroke="#38151b" stroke-width="5"/>
+  <path d="M88 58l24 18-20 9" fill="none" stroke="#ff938b" stroke-width="6"/>
+</g>
+
+<!-- 2 blue tower -->
+<g transform="translate(256 0)">
+  <ellipse cx="64" cy="114" rx="43" ry="10" fill="#000" opacity=".34"/>
+  <path d="M34 108l8-66 22-27 23 27 9 66z" fill="url(#stoneB)" stroke="#102c40" stroke-width="6"/>
+  <path d="M44 48h40l8 14-8 12H44l-8-12z" fill="#2a607c" stroke="#82d8ff" stroke-width="4"/>
+  <path d="M48 31l16-18 16 18-5 18H53z" fill="#4c9fc8" stroke="#bceeff" stroke-width="4"/>
+  <circle cx="64" cy="58" r="12" fill="#b7efff" opacity=".92"/>
+  <circle cx="64" cy="58" r="23" fill="#65cfff" opacity=".18" filter="url(#glow)"/>
+  <path d="M52 82h24M49 94h30" stroke="#9edfff" stroke-width="3" opacity=".6"/>
+</g>
+
+<!-- 3 red tower -->
+<g transform="translate(384 0)">
+  <ellipse cx="64" cy="114" rx="43" ry="10" fill="#000" opacity=".34"/>
+  <path d="M34 108l8-66 22-27 23 27 9 66z" fill="url(#stoneR)" stroke="#3f171d" stroke-width="6"/>
+  <path d="M44 48h40l8 14-8 12H44l-8-12z" fill="#762f36" stroke="#ff9187" stroke-width="4"/>
+  <path d="M48 31l16-18 16 18-5 18H53z" fill="#b64c4e" stroke="#ffd1c8" stroke-width="4"/>
+  <circle cx="64" cy="58" r="12" fill="#ffd1c7" opacity=".92"/>
+  <circle cx="64" cy="58" r="23" fill="#ff6969" opacity=".18" filter="url(#glow)"/>
+  <path d="M52 82h24M49 94h30" stroke="#ffb0a8" stroke-width="3" opacity=".6"/>
+</g>
+
+<!-- 4 jungle monster -->
+<g transform="translate(512 0)">
+  <ellipse cx="64" cy="109" rx="38" ry="10" fill="#000" opacity=".3"/>
+  <path d="M37 87l7-41 20-19 22 18 8 41-14 21H50z" fill="url(#beast)" stroke="#2b2119" stroke-width="6"/>
+  <path d="M45 45l-17-20 8 32M84 45l18-21-9 33" fill="#9c7544" stroke="#3b2c1d" stroke-width="5"/>
+  <path d="M48 58q16-20 32 0l-5 23H53z" fill="#4c3928"/>
+  <circle cx="57" cy="63" r="4" fill="#ffca5f"/>
+  <circle cx="72" cy="63" r="4" fill="#ffca5f"/>
+  <path d="M58 77l7 6 8-6" fill="none" stroke="#d7b173" stroke-width="4"/>
+  <path d="M45 95l-16 20M84 95l17 20" stroke="#795735" stroke-width="7"/>
+</g>
+
+<!-- 5 epic objective -->
+<g transform="translate(640 0)">
+  <ellipse cx="64" cy="110" rx="45" ry="11" fill="#000" opacity=".34"/>
+  <circle cx="64" cy="61" r="42" fill="#1f102d" stroke="#884abb" stroke-width="6"/>
+  <circle cx="64" cy="61" r="30" fill="url(#void)"/>
+  <path d="M64 16l11 19 22-3-11 20 12 19-23-3-11 20-11-20-23 3 12-19-11-20 22 3z" fill="#8f50bd" stroke="#e4bdff" stroke-width="4"/>
+  <circle cx="64" cy="61" r="14" fill="#f3dcff"/>
+  <circle cx="64" cy="61" r="50" fill="#c56cff" opacity=".15" filter="url(#glow)"/>
+  <path d="M43 98l-12 19M85 98l13 19" stroke="#5b2d79" stroke-width="8"/>
+</g>
+
+<!-- 6 blue ward -->
+<g transform="translate(768 0)">
+  <ellipse cx="64" cy="109" rx="18" ry="6" fill="#000" opacity=".25"/>
+  <path d="M64 29l17 29-17 20-17-20z" fill="#64cfff" stroke="#183e56" stroke-width="5"/>
+  <circle cx="64" cy="56" r="8" fill="#e7fbff"/>
+  <path d="M64 78v34M50 112h28" stroke="#428eae" stroke-width="6"/>
+  <circle cx="64" cy="55" r="28" fill="#6fe5ff" opacity=".14" filter="url(#glow)"/>
+</g>
+
+<!-- 7 red ward -->
+<g transform="translate(896 0)">
+  <ellipse cx="64" cy="109" rx="18" ry="6" fill="#000" opacity=".25"/>
+  <path d="M64 29l17 29-17 20-17-20z" fill="#ff7771" stroke="#5d2227" stroke-width="5"/>
+  <circle cx="64" cy="56" r="8" fill="#fff0ed"/>
+  <path d="M64 78v34M50 112h28" stroke="#b54f50" stroke-width="6"/>
+  <circle cx="64" cy="55" r="28" fill="#ff7a70" opacity=".14" filter="url(#glow)"/>
+</g>
+</svg>

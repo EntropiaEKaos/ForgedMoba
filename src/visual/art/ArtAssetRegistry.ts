@@ -8,6 +8,8 @@ import {
   type ArtManifest,
   type HeroArtAnimation,
   type HeroAtlasDefinition,
+  type WorldArtKey,
+  type WorldSpriteDefinition,
 } from './types.ts';
 
 interface LoadedHeroAtlas {
@@ -19,6 +21,7 @@ export class ArtAssetRegistry {
   private manifest: ArtManifest | null = null;
   private terrainTexture: Texture | null = null;
   private readonly heroes = new Map<string, LoadedHeroAtlas>();
+  private readonly world = new Map<WorldArtKey, { definition: WorldSpriteDefinition; texture: Texture }>();
   private ready = false;
   private failure: string | null = null;
 
@@ -30,6 +33,20 @@ export class ArtAssetRegistry {
       this.manifest = manifest;
 
       this.terrainTexture = await Assets.load<Texture>(manifest.terrain.map);
+
+      const worldSource = await Assets.load<Texture>(manifest.world.source);
+      for (const [key, definition] of Object.entries(manifest.world.sprites) as Array<[WorldArtKey, WorldSpriteDefinition]>) {
+        const texture = new Texture({
+          source: worldSource.source,
+          frame: new Rectangle(
+            definition.frame * manifest.world.frameWidth,
+            0,
+            manifest.world.frameWidth,
+            manifest.world.frameHeight,
+          ),
+        });
+        this.world.set(key, { definition, texture });
+      }
 
       for (const definition of manifest.heroes) {
         const source = await Assets.load<Texture>(definition.source);
@@ -74,6 +91,16 @@ export class ArtAssetRegistry {
 
   get terrain(): Texture | null {
     return this.terrainTexture;
+  }
+
+  worldDefinition(key: WorldArtKey | null): WorldSpriteDefinition | null {
+    if (!key) return null;
+    return this.world.get(key)?.definition ?? null;
+  }
+
+  worldTexture(key: WorldArtKey | null): Texture | null {
+    if (!key) return null;
+    return this.world.get(key)?.texture ?? null;
   }
 
   heroDefinition(heroId: string | null): HeroAtlasDefinition | null {

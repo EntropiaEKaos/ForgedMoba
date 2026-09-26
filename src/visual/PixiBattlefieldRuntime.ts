@@ -21,7 +21,7 @@ import {
   type CinematicCameraCue,
 } from './cinematicModel.ts';
 import { ArtAssetRegistry } from './art/ArtAssetRegistry.ts';
-import type { HeroArtAnimation } from './art/types.ts';
+import type { HeroArtAnimation, WorldArtKey } from './art/types.ts';
 
 interface ActiveCameraCue extends CinematicCameraCue {
   startedAt: number;
@@ -75,6 +75,16 @@ function displayColor(entity: SimEntity, isLocal: boolean): number {
   if (entity.kind === 'monster') return ENTITY_COLORS.monster;
   if (entity.kind === 'objective') return ENTITY_COLORS.objective;
   return entity.team === 0 ? ENTITY_COLORS.blueWard : ENTITY_COLORS.redWard;
+}
+
+
+function worldArtKey(entity: SimEntity): WorldArtKey | null {
+  if (entity.kind === 'minion') return entity.team === 0 ? 'blue-minion' : 'red-minion';
+  if (entity.kind === 'tower') return entity.team === 0 ? 'blue-tower' : 'red-tower';
+  if (entity.kind === 'monster') return 'jungle-monster';
+  if (entity.kind === 'objective') return 'epic-objective';
+  if (entity.kind === 'ward') return entity.team === 0 ? 'blue-ward' : 'red-ward';
+  return null;
 }
 
 function entityLabel(entity: SimEntity): string {
@@ -408,7 +418,9 @@ export class PixiBattlefieldRuntime {
     const heroArt = entity.kind === 'hero'
       ? this.artAssets.heroDefinition(entity.heroId)
       : null;
-    const shadowScale = heroArt?.shadowScale ?? 1;
+    const worldKey = worldArtKey(entity);
+    const worldArt = this.artAssets.worldDefinition(worldKey);
+    const shadowScale = heroArt?.shadowScale ?? worldArt?.shadowScale ?? 1;
 
     node.shadow.clear()
       .ellipse(
@@ -419,18 +431,24 @@ export class PixiBattlefieldRuntime {
       )
       .fill({ color: 0x000000, alpha: this.quality === 'low' ? 0.25 : 0.42 });
 
-    node.art.visible = Boolean(heroArt);
-    node.body.visible = !heroArt;
+    const hasProductionArt = Boolean(heroArt || worldArt);
+    node.art.visible = hasProductionArt;
+    node.body.visible = !hasProductionArt;
     if (heroArt) {
       node.art.anchor.set(heroArt.anchor.x, heroArt.anchor.y);
       node.art.scale.set(heroArt.scale);
       const texture = this.artAssets.heroTexture(entity.heroId, 'idle', 0);
       if (texture) node.art.texture = texture;
+    } else if (worldArt) {
+      node.art.anchor.set(worldArt.anchor.x, worldArt.anchor.y);
+      node.art.scale.set(worldArt.scale);
+      const texture = this.artAssets.worldTexture(worldKey);
+      if (texture) node.art.texture = texture;
     }
 
     node.body.clear();
-    if (heroArt) {
-      // Production art owns the hero silhouette. Graphics remains the safety fallback.
+    if (hasProductionArt) {
+      // Production art owns the silhouette. Graphics remains the safety fallback.
     } else if (entity.kind === 'tower') {
       node.body.roundRect(-radius, -radius * 1.35, radius * 2, radius * 2.7, radius * 0.28)
         .fill(color)
@@ -457,7 +475,13 @@ export class PixiBattlefieldRuntime {
 
     node.label.text = entityLabel(entity);
     node.label.visible = Boolean(node.label.text);
-    node.label.position.set(0, heroArt ? -radius * 3.4 : -radius - 10);
+    node.label.position.set(
+      0,
+      heroArt ? -radius * 3.4 :
+      worldArt && entity.kind === 'tower' ? -radius * 2.7 :
+      worldArt ? -radius * 2.1 :
+      -radius - 10,
+    );
   }
 
   private resolveHeroPose(node: EntityNode, entity: SimEntity, now: number): HeroArtAnimation {
@@ -507,6 +531,8 @@ export class PixiBattlefieldRuntime {
     const heroArt = entity.kind === 'hero'
       ? this.artAssets.heroDefinition(entity.heroId)
       : null;
+    const worldKey = worldArtKey(entity);
+    const worldArt = this.artAssets.worldDefinition(worldKey);
     if (heroArt) {
       const pose = this.resolveHeroPose(node, entity, now);
       const texture = this.artAssets.heroTexture(
@@ -518,6 +544,18 @@ export class PixiBattlefieldRuntime {
       const flashScale = flashing ? 1.045 : 1;
       node.art.scale.set(heroArt.scale * flashScale);
       node.art.alpha = flashing ? 0.76 : 1;
+      node.art.visible = true;
+      node.body.visible = false;
+    } else if (worldArt) {
+      const texture = this.artAssets.worldTexture(worldKey);
+      if (texture) node.art.texture = texture;
+      const pulse =
+        entity.kind === 'objective' ? 1 + Math.sin(now / 260) * 0.055 :
+        entity.kind === 'ward' ? 1 + Math.sin(now / 420) * 0.035 :
+        1;
+      const flashScale = flashing ? 1.05 : 1;
+      node.art.scale.set(worldArt.scale * pulse * flashScale);
+      node.art.alpha = flashing ? 0.74 : 1;
       node.art.visible = true;
       node.body.visible = false;
     } else {

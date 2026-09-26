@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "id": "forged-art-v2.0.0",
+  "id": "forged-art-v2.1.0",
   "terrain": {
     "map": "/assets/art/v2/terrain/rift-map.svg",
     "nativeWidth": 1600,
@@ -12,14 +12,44 @@
       "source": "/assets/art/v2/heroes/gareth-sheet.svg",
       "frameWidth": 128,
       "frameHeight": 128,
-      "anchor": { "x": 0.5, "y": 0.78 },
+      "anchor": {
+        "x": 0.5,
+        "y": 0.78
+      },
       "scale": 0.72,
       "shadowScale": 1.15,
       "animations": {
-        "idle": { "frames": [0], "fps": 4, "loop": true },
-        "run": { "frames": [1, 0], "fps": 7, "loop": true },
-        "attack": { "frames": [2, 0], "fps": 10, "loop": false },
-        "cast": { "frames": [3, 0], "fps": 9, "loop": false }
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 4,
+          "loop": true
+        },
+        "run": {
+          "frames": [
+            1,
+            0
+          ],
+          "fps": 7,
+          "loop": true
+        },
+        "attack": {
+          "frames": [
+            2,
+            0
+          ],
+          "fps": 10,
+          "loop": false
+        },
+        "cast": {
+          "frames": [
+            3,
+            0
+          ],
+          "fps": 9,
+          "loop": false
+        }
       }
     },
     {
@@ -27,15 +57,124 @@
       "source": "/assets/art/v2/heroes/luxana-sheet.svg",
       "frameWidth": 128,
       "frameHeight": 128,
-      "anchor": { "x": 0.5, "y": 0.78 },
+      "anchor": {
+        "x": 0.5,
+        "y": 0.78
+      },
       "scale": 0.72,
       "shadowScale": 1.1,
       "animations": {
-        "idle": { "frames": [0], "fps": 4, "loop": true },
-        "run": { "frames": [1, 0], "fps": 7, "loop": true },
-        "attack": { "frames": [2, 0], "fps": 10, "loop": false },
-        "cast": { "frames": [3, 0], "fps": 9, "loop": false }
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 4,
+          "loop": true
+        },
+        "run": {
+          "frames": [
+            1,
+            0
+          ],
+          "fps": 7,
+          "loop": true
+        },
+        "attack": {
+          "frames": [
+            2,
+            0
+          ],
+          "fps": 10,
+          "loop": false
+        },
+        "cast": {
+          "frames": [
+            3,
+            0
+          ],
+          "fps": 9,
+          "loop": false
+        }
       }
     }
-  ]
+  ],
+  "world": {
+    "source": "/assets/art/v2/world/world-sheet.svg",
+    "frameWidth": 128,
+    "frameHeight": 128,
+    "sprites": {
+      "blue-minion": {
+        "frame": 0,
+        "anchor": {
+          "x": 0.5,
+          "y": 0.72
+        },
+        "scale": 0.46,
+        "shadowScale": 0.8
+      },
+      "red-minion": {
+        "frame": 1,
+        "anchor": {
+          "x": 0.5,
+          "y": 0.72
+        },
+        "scale": 0.46,
+        "shadowScale": 0.8
+      },
+      "blue-tower": {
+        "frame": 2,
+        "anchor": {
+          "x": 0.5,
+          "y": 0.86
+        },
+        "scale": 0.88,
+        "shadowScale": 1.45
+      },
+      "red-tower": {
+        "frame": 3,
+        "anchor": {
+          "x": 0.5,
+          "y": 0.86
+        },
+        "scale": 0.88,
+        "shadowScale": 1.45
+      },
+      "jungle-monster": {
+        "frame": 4,
+        "anchor": {
+          "x": 0.5,
+          "y": 0.74
+        },
+        "scale": 0.76,
+        "shadowScale": 1.15
+      },
+      "epic-objective": {
+        "frame": 5,
+        "anchor": {
+          "x": 0.5,
+          "y": 0.72
+        },
+        "scale": 1.05,
+        "shadowScale": 1.5
+      },
+      "blue-ward": {
+        "frame": 6,
+        "anchor": {
+          "x": 0.5,
+          "y": 0.75
+        },
+        "scale": 0.38,
+        "shadowScale": 0.5
+      },
+      "red-ward": {
+        "frame": 7,
+        "anchor": {
+          "x": 0.5,
+          "y": 0.75
+        },
+        "scale": 0.38,
+        "shadowScale": 0.5
+      }
+    }
+  }
 }
