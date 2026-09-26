@@ -204,8 +204,8 @@ The deterministic proof now deliberately shows several systems in one frame wind
 2. local level-up;
 3. new item equipped;
 4. new allied ward;
-5. authoritative Gareth Q;
-6. combat/status impact;
+5. authoritative Luxana Q with a visible MeshSimple root beam;
+6. authoritative Gareth Q and combat/status impact;
 7. Gareth Ember skin material;
 8. full-game bridge coverage panel.
 
