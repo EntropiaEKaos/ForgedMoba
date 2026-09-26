@@ -31,6 +31,7 @@ interface ActiveCameraCue extends CinematicCameraCue {
 interface EntityNode {
   root: Container;
   aura: Graphics;
+  sigil: Graphics;
   shadow: Graphics;
   selection: Graphics;
   art: Sprite;
@@ -374,6 +375,8 @@ export class PixiBattlefieldRuntime {
     const root = new Container();
     const aura = new Graphics();
     aura.blendMode = 'add';
+    const sigil = new Graphics();
+    sigil.blendMode = 'add';
     const shadow = new Graphics();
     const selection = new Graphics();
     const art = new Sprite();
@@ -391,11 +394,12 @@ export class PixiBattlefieldRuntime {
     });
     label.anchor.set(0.5, 1);
 
-    root.addChild(aura, shadow, selection, art, body, health, label);
+    root.addChild(aura, sigil, shadow, selection, art, body, health, label);
     this.entities.addChild(root);
     const node: EntityNode = {
       root,
       aura,
+      sigil,
       shadow,
       selection,
       art,
@@ -427,6 +431,7 @@ export class PixiBattlefieldRuntime {
     const shadowScale = heroArt?.shadowScale ?? worldArt?.shadowScale ?? 1;
 
     node.aura.clear();
+    node.sigil.clear();
     if (entity.kind === 'hero') {
       const auraColor = isLocal ? 0xffdf72 : entity.team === 0 ? 0x4cbcff : 0xff6262;
       node.aura
@@ -434,12 +439,36 @@ export class PixiBattlefieldRuntime {
         .fill({ color: auraColor, alpha: isLocal ? 0.12 : 0.065 })
         .circle(0, 3, radius * 1.42)
         .stroke({ color: auraColor, alpha: isLocal ? 0.5 : 0.25, width: isLocal ? 3 : 2 });
+      if (isLocal) {
+        node.sigil
+          .circle(0, 3, radius * 1.92)
+          .stroke({ color: 0xffdf72, alpha: 0.34, width: 2 })
+          .arc(0, 3, radius * 2.14, -0.28, 0.52)
+          .stroke({ color: 0xffffff, alpha: 0.72, width: 3 })
+          .arc(0, 3, radius * 2.14, 1.28, 2.08)
+          .stroke({ color: 0xffc94f, alpha: 0.62, width: 3 })
+          .arc(0, 3, radius * 2.14, 2.86, 3.66)
+          .stroke({ color: 0xffffff, alpha: 0.62, width: 3 })
+          .arc(0, 3, radius * 2.14, 4.42, 5.22)
+          .stroke({ color: 0xffc94f, alpha: 0.62, width: 3 });
+      }
     } else if (entity.kind === 'objective') {
       node.aura
         .circle(0, 0, radius * 3.4)
         .fill({ color: 0xb06cff, alpha: 0.09 })
         .circle(0, 0, radius * 2.05)
         .stroke({ color: 0xd9a2ff, alpha: 0.44, width: 4 });
+      node.sigil
+        .circle(0, 0, radius * 2.55)
+        .stroke({ color: 0xc98cff, alpha: 0.34, width: 2 })
+        .circle(0, 0, radius * 2.82)
+        .stroke({ color: 0x7b4cff, alpha: 0.22, width: 2 })
+        .arc(0, 0, radius * 3.02, 0, 0.72)
+        .stroke({ color: 0xf0c1ff, alpha: 0.64, width: 4 })
+        .arc(0, 0, radius * 3.02, 2.1, 2.82)
+        .stroke({ color: 0xf0c1ff, alpha: 0.64, width: 4 })
+        .arc(0, 0, radius * 3.02, 4.2, 4.92)
+        .stroke({ color: 0xf0c1ff, alpha: 0.64, width: 4 });
     } else if (entity.kind === 'tower') {
       const auraColor = entity.team === 0 ? 0x4aa8ff : 0xff5f5f;
       node.aura
@@ -447,6 +476,11 @@ export class PixiBattlefieldRuntime {
         .fill({ color: auraColor, alpha: 0.07 })
         .ellipse(0, radius * 1.05, radius * 1.4, radius * 0.5)
         .stroke({ color: auraColor, alpha: 0.32, width: 3 });
+      node.sigil
+        .arc(0, radius * 0.92, radius * 1.82, -0.45, 0.45)
+        .stroke({ color: auraColor, alpha: 0.28, width: 2.5 })
+        .arc(0, radius * 0.92, radius * 1.82, 2.7, 3.58)
+        .stroke({ color: auraColor, alpha: 0.28, width: 2.5 });
     }
 
     node.shadow.clear()
@@ -566,6 +600,17 @@ export class PixiBattlefieldRuntime {
           ? 0.86 + Math.sin(now / 420 + entity.id) * 0.12
           : 1;
     node.selection.rotation = now / 2200;
+    node.sigil.rotation =
+      entity.kind === 'objective' ? -now / 2600 :
+      entity.kind === 'hero' && isLocal ? now / 3400 :
+      entity.kind === 'tower' ? now / 7200 :
+      0;
+    node.sigil.alpha =
+      entity.kind === 'objective'
+        ? 0.72 + Math.sin(now / 310) * 0.18
+        : entity.kind === 'hero' && isLocal
+          ? 0.66 + Math.sin(now / 430) * 0.14
+          : 0.72;
 
     node.body.scale.set(flashing ? 1.08 : 1);
     node.body.alpha = flashing ? 0.72 : 1;
