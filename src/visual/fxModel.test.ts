@@ -20,7 +20,7 @@ test('damage/death FX are derived from state deltas only', () => {
   assert.ok(events.some((event) => event.type === 'death'));
 });
 
-test('Q and new crowd-control status produce visual events', () => {
+test('authoritative ability casts and crowd-control status produce visual events', () => {
   const state = createSimulation({
     seed: 11,
     players: [
@@ -31,7 +31,7 @@ test('Q and new crowd-control status produce visual events', () => {
   const before = captureVisualProbe(state);
   stepSimulation(state, [{ type: 'cast', playerId: 'a', seq: 1, tick: 0, slot: 'Q', targetId: 2 }]);
   const events = deriveCombatFx(before, captureVisualProbe(state));
-  assert.ok(events.some((event) => event.type === 'q-cast' && event.entityId === 1));
+  assert.ok(events.some((event) => event.type === 'ability-cast' && event.entityId === 1 && event.slot === 'Q'));
   assert.ok(events.some((event) => event.type === 'status-impact' && event.entityId === 2));
 });
 

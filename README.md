@@ -7,6 +7,8 @@
 
 **Pixel Rift** é um MOBA 2D completo, super expressivo e de alto impacto visual, com estilo artístico inspirado nos traços grossos, cel-shading e cabeças gigantes de **Awesomenauts**, mecânicas consagradas de **League of Legends** (Summoner's Rift espelhado, T1/T2/T3, Dragão, Barão, Inibidores e Arbustos/Invisibilidade) e a profundidade de jogo de **Dota** (Deny de minions, Buyback e Runas de Poder periódicas no Rio).
 
+> **ForgedMoba 3.0:** o multiplayer publica o catálogo completo de 48 heróis, 192 habilidades e 39 itens em um pacote com hash. Q/W/E/R, mana, dano, resistências, controles, cura, escudo, receitas e economia são resolvidos pelo servidor autoritativo; o PixiJS apresenta o elenco inteiro sem assumir autoridade de gameplay.
+
 O projeto é construído em React, TypeScript e Tailwind CSS no cliente, compilando para um único arquivo estático de alta performance (`dist/index.html`), e conta com um servidor Node.js/Express/Socket.io na pasta `/server` para suportar contas, JWT, salas e matchmaking online de forma integrada!
 
 ---
@@ -44,10 +46,12 @@ O projeto é construído em React, TypeScript e Tailwind CSS no cliente, compila
 - **Editor de Itens**: Crie novos itens, defina preços, receitas por ID, stats e ícone de glyph.
 - **Modos e Mapas**: Crie e persista presets de jogo, regras e tamanhos para expansão.
 
-### 5. 🌐 Fase 2: Online & Multiplayer Inteligente
+### 5. 🌐 Multiplayer autoritativo
 - **Health Check**: O cliente verifica no boot se o servidor está online. Se estiver, libera o fluxo de Login/Registro reais com JWT; se não estiver, cai de forma limpa e graciosa para o modo local com bots (modo Convidado).
 - **Lobby com Matchmaking**: Fila de espera interativa com posição na fila, tempo estimado de espera e barra de progresso.
-- **P2P Multi-Aba**: Canal `BroadcastChannel` para sincronizar mensagens de chat rápido e pings de mapa em tempo real entre abas no mesmo navegador.
+- **Servidor a 30 Hz**: comandos validados, snapshots com hash, prediction/reconciliation, interpolação remota e reconnect controlado.
+- **Filas reais**: Duel 1v1, Skirmish 3v3 e Ranked 5v5 com draft de dez jogadores.
+- **Conteúdo compatível**: cliente e servidor precisam anunciar exatamente o mesmo `contentVersion`.
 
 ---
 

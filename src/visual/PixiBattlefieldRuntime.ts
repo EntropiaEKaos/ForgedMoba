@@ -6,6 +6,7 @@ import {
   Text,
 } from 'pixi.js';
 import type { InterpolatedFrame } from '../network/interpolation.ts';
+import { authoritativeHero, type AuthoritativeHeroContent } from '../shared/authoritativeContent.ts';
 import type { SimEntity, SimulationState } from '../simulation/types.ts';
 import { screenToWorld, type CameraViewport, type Point2 } from './camera.ts';
 import {
@@ -43,7 +44,7 @@ interface EntityNode {
   poseStartedAt: number;
   poseUntil: number;
   lastAttackCooldown: number;
-  lastQCooldown: number;
+  lastAbilityCooldowns: SimEntity['abilityCooldowns'];
 }
 
 export interface BattlefieldRenderInput {
@@ -104,6 +105,33 @@ function signature(entity: SimEntity, isLocal: boolean): string {
     entity.campId ?? '',
     isLocal ? 'local' : 'remote',
   ].join(':');
+}
+
+function drawProceduralHero(body: Graphics, hero: AuthoritativeHeroContent, radius: number): void {
+  const primary = hero.visual.primary;
+  const secondary = hero.visual.secondary;
+  const accent = hero.visual.accent;
+  body
+    .ellipse(0, radius * .72, radius * .95, radius * .34)
+    .fill({ color: '#000000', alpha: .28 })
+    .roundRect(-radius * .78, -radius * 1.15, radius * 1.56, radius * 1.85, radius * .36)
+    .fill(primary)
+    .stroke({ color: accent, alpha: .95, width: 2.5 })
+    .circle(0, -radius * 1.24, radius * .68)
+    .fill(secondary)
+    .stroke({ color: '#081014', alpha: .95, width: 3 })
+    .circle(-radius * .22, -radius * 1.3, radius * .09)
+    .circle(radius * .22, -radius * 1.3, radius * .09)
+    .fill(accent)
+    .poly([-radius * .72, -radius * .58, 0, -radius * .92, radius * .72, -radius * .58, radius * .48, -radius * .2, -radius * .48, -radius * .2])
+    .fill({ color: accent, alpha: .72 });
+  if (hero.visual.weapon === 'bow' || hero.visual.weapon === 'staff' || hero.visual.weapon === 'blowgun') {
+    body.moveTo(radius * .82, -radius * 1.02).lineTo(radius * 1.25, radius * .72).stroke({ color: accent, width: 4 });
+  } else if (hero.visual.weapon !== 'fists') {
+    body.moveTo(radius * .72, -radius * .4).lineTo(radius * 1.35, -radius * 1.45).stroke({ color: '#e9f5f5', width: 5 });
+  } else {
+    body.circle(-radius, 0, radius * .26).circle(radius, 0, radius * .26).fill(accent);
+  }
 }
 
 export class PixiBattlefieldRuntime {
@@ -411,7 +439,7 @@ export class PixiBattlefieldRuntime {
       poseStartedAt: 0,
       poseUntil: 0,
       lastAttackCooldown: entity.attackCooldownRemaining,
-      lastQCooldown: entity.abilityCooldowns.Q,
+      lastAbilityCooldowns: { ...entity.abilityCooldowns },
     };
     this.nodes.set(entity.id, node);
     this.rebuildNode(node, entity, isLocal);
@@ -510,6 +538,8 @@ export class PixiBattlefieldRuntime {
     node.body.clear();
     if (hasProductionArt) {
       // Production art owns the silhouette. Graphics remains the safety fallback.
+    } else if (entity.kind === 'hero' && entity.heroId) {
+      drawProceduralHero(node.body, authoritativeHero(entity.heroId), radius);
     } else if (entity.kind === 'tower') {
       node.body.roundRect(-radius, -radius * 1.35, radius * 2, radius * 2.7, radius * 0.28)
         .fill(color)
@@ -551,10 +581,12 @@ export class PixiBattlefieldRuntime {
   }
 
   private resolveHeroPose(node: EntityNode, entity: SimEntity, now: number): HeroArtAnimation {
-    const qCooldown = entity.abilityCooldowns.Q;
+    const castStarted = (['Q', 'W', 'E', 'R'] as const).some(
+      (slot) => entity.abilityCooldowns[slot] > node.lastAbilityCooldowns[slot] + 1,
+    );
     const attackCooldown = entity.attackCooldownRemaining;
 
-    if (qCooldown > node.lastQCooldown + 1) {
+    if (castStarted) {
       node.pose = 'cast';
       node.poseStartedAt = now;
       node.poseUntil = now + 420;
@@ -564,7 +596,7 @@ export class PixiBattlefieldRuntime {
       node.poseUntil = now + 320;
     }
 
-    node.lastQCooldown = qCooldown;
+    node.lastAbilityCooldowns = { ...entity.abilityCooldowns };
     node.lastAttackCooldown = attackCooldown;
 
     if (now < node.poseUntil) return node.pose;
@@ -620,8 +652,9 @@ export class PixiBattlefieldRuntime {
       : null;
     const worldKey = worldArtKey(entity);
     const worldArt = this.artAssets.worldDefinition(worldKey);
+    const heroPose = entity.kind === 'hero' ? this.resolveHeroPose(node, entity, now) : 'idle';
     if (heroArt) {
-      const pose = this.resolveHeroPose(node, entity, now);
+      const pose = heroPose;
       const texture = this.artAssets.heroTexture(
         entity.heroId,
         pose,
@@ -648,6 +681,18 @@ export class PixiBattlefieldRuntime {
     } else {
       node.art.visible = false;
       node.body.visible = true;
+      if (entity.kind === 'hero') {
+        const moving = heroPose === 'run';
+        const casting = heroPose === 'cast';
+        const attacking = heroPose === 'attack';
+        const bob = moving ? Math.sin(now / 72 + entity.id) * 2.4 : Math.sin(now / 420 + entity.id) * 1.2;
+        node.body.position.y = bob - (casting ? 3 : 0);
+        node.body.rotation = attacking ? Math.sin(now / 45) * .12 : 0;
+        node.body.scale.set(flashing ? 1.08 : casting ? 1.06 : 1);
+      } else {
+        node.body.position.y = 0;
+        node.body.rotation = 0;
+      }
     }
 
     const radius = Math.max(7, entity.radius * 1.2);

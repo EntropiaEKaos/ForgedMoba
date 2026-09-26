@@ -6,9 +6,9 @@ export const WAVE_INTERVAL_TICKS = SIM_TICK_RATE * 30;
 
 export type SimTeam = 0 | 1;
 export type SimEntityKind = 'hero' | 'minion' | 'tower' | 'monster' | 'objective' | 'ward';
-export type SimHeroId = 'gareth' | 'luxana';
+export type SimHeroId = string;
 export type SimAbilitySlot = 'Q' | 'W' | 'E' | 'R';
-export type SimStatusKind = 'stun' | 'root' | 'slow';
+export type SimStatusKind = 'stun' | 'root' | 'slow' | 'silence' | 'haste' | 'damage-reduction';
 
 export interface SimVec {
   x: number;
@@ -37,13 +37,25 @@ export interface SimEntity {
   attackTargetId: EntityId | null;
   hp: number;
   maxHp: number;
+  mana: number;
+  maxMana: number;
+  shieldHp: number;
   attackDamage: number;
+  abilityPower: number;
+  armor: number;
+  magicResist: number;
+  magicPenPermille: number;
   attackRange: number;
+  baseAttackCooldownTicks: number;
   attackCooldownTicks: number;
   attackCooldownRemaining: number;
+  attackSpeedPermille: number;
   abilityCooldowns: Record<SimAbilitySlot, number>;
   moveSpeedPerTick: number;
   critChancePermille: number;
+  lifestealPermille: number;
+  hpRegenPerSecond: number;
+  manaRegenPerSecond: number;
   aggroRange: number;
   statuses: SimStatus[];
   towerAggroUntilTick: number;
@@ -65,7 +77,7 @@ export interface SimEntity {
 }
 
 export interface SimulationState {
-  version: 3;
+  version: 4;
   contentVersion: string;
   tick: number;
   seed: number;

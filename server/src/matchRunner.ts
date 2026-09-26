@@ -79,7 +79,7 @@ function normalizeCoreCommand(playerId: PlayerId, raw: PlayerCommand): CoreSimul
     };
   }
   if (raw.type === 'cast') {
-    if (raw.slot !== 'Q') return null;
+    if (!['Q', 'W', 'E', 'R'].includes(raw.slot)) return null;
     let targetId: number | undefined;
     if (raw.targetId !== undefined) {
       const parsedTargetId = finiteInt(raw.targetId);
@@ -93,7 +93,7 @@ function normalizeCoreCommand(playerId: PlayerId, raw: PlayerCommand): CoreSimul
       playerId,
       seq,
       tick,
-      slot: 'Q',
+      slot: raw.slot,
       x: raw.x === undefined ? undefined : Math.trunc(raw.x),
       y: raw.y === undefined ? undefined : Math.trunc(raw.y),
       targetId: targetId ?? undefined,
@@ -186,7 +186,6 @@ export class MatchRunner {
   enqueue(playerId: PlayerId, command: PlayerCommand): MatchInputResult {
     if (!this.playerIds.has(playerId)) return { ok: false, code: 'unknown-player' };
     if (!['move', 'attack', 'stop', 'cast', 'buy', 'place-ward'].includes(command.type)) return { ok: false, code: 'unsupported-command' };
-    if (command.type === 'cast' && command.slot !== 'Q') return { ok: false, code: 'unsupported-command' };
     const normalized = normalizeCoreCommand(playerId, command);
     if (!normalized) return { ok: false, code: 'invalid-command' };
 

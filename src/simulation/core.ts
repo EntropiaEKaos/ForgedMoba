@@ -1,14 +1,19 @@
 import type { CoreSimulationCommand, EntityId, PlayerId } from '../shared/protocol.ts';
 import {
   CURRENT_AUTHORITATIVE_CONTENT,
+  authoritativeAbility,
   authoritativeHero,
   authoritativeItem,
+  type AuthoritativeAbilityContent,
   type AuthoritativeContentPayload,
+  type AuthoritativeDamageType,
+  type AuthoritativeItemContent,
   type AuthoritativeNeutralContent,
 } from '../shared/authoritativeContent.ts';
 import { normalizeSeed, rollPermille } from './rng.ts';
 import { buildSpatialHash, querySpatialHash, type SpatialHash } from './spatialHash.ts';
 import {
+  SIM_TICK_RATE,
   WAVE_INTERVAL_TICKS,
   type CreateSimulationOptions,
   type SimAbilitySlot,
@@ -73,13 +78,25 @@ function entityByPlayer(state: SimulationState, playerId: PlayerId): SimEntity |
   return null;
 }
 
-function heroIdFor(player: CreateSimulationOptions['players'][number]): SimHeroId {
-  if (player.heroId === 'gareth' || player.heroId === 'luxana') return player.heroId;
-  return player.team === 0 ? 'gareth' : 'luxana';
+function heroIdFor(
+  player: CreateSimulationOptions['players'][number],
+  content: AuthoritativeContentPayload,
+): SimHeroId {
+  if (player.heroId && content.heroes.some((hero) => hero.id === player.heroId)) return player.heroId;
+  return content.heroes[player.team === 0 ? 0 : Math.min(1, content.heroes.length - 1)].id;
 }
 
 function baseEntityFields() {
   return {
+    mana: 0,
+    maxMana: 0,
+    shieldHp: 0,
+    abilityPower: 0,
+    armor: 0,
+    magicResist: 0,
+    magicPenPermille: 0,
+    baseAttackCooldownTicks: 1,
+    attackSpeedPermille: 1000,
     abilityCooldowns: EMPTY_COOLDOWNS(),
     statuses: [] as SimStatus[],
     towerAggroUntilTick: 0,
@@ -90,6 +107,9 @@ function baseEntityFields() {
     expiresAtTick: null as number | null,
     wardCooldownRemaining: 0,
     inventory: [] as string[],
+    lifestealPermille: 0,
+    hpRegenPerSecond: 0,
+    manaRegenPerSecond: 0,
   };
 }
 
@@ -101,7 +121,7 @@ function createHero(
   const id: EntityId = state.nextEntityId++;
   const x = clampInt(player.x, 0, state.width);
   const y = clampInt(player.y, 0, state.height);
-  const heroId = heroIdFor(player);
+  const heroId = heroIdFor(player, content);
   const publishedHero = authoritativeHero(heroId, content);
   return {
     id,
@@ -123,6 +143,15 @@ function createHero(
     attackCooldownTicks: publishedHero.attackCooldownTicks,
     attackCooldownRemaining: 0,
     ...baseEntityFields(),
+    mana: publishedHero.maxMana,
+    maxMana: publishedHero.maxMana,
+    abilityPower: publishedHero.abilityPower,
+    armor: publishedHero.armor,
+    magicResist: publishedHero.magicResist,
+    baseAttackCooldownTicks: publishedHero.attackCooldownTicks,
+    lifestealPermille: publishedHero.lifestealPermille,
+    hpRegenPerSecond: publishedHero.hpRegenPerSecond,
+    manaRegenPerSecond: publishedHero.manaRegenPerSecond,
     visionRadius: content.rules.heroVisionRadius,
     moveSpeedPerTick: publishedHero.moveSpeedPerTick,
     critChancePermille: publishedHero.critChancePermille,
@@ -320,8 +349,10 @@ function upsertStatus(entity: SimEntity, status: SimStatus): void {
 function effectiveMoveStep(entity: SimEntity, tick: number): number {
   if (statusActive(entity, 'stun', tick) || statusActive(entity, 'root', tick)) return 0;
   const slow = statusActive(entity, 'slow', tick);
-  if (!slow) return entity.moveSpeedPerTick;
-  return Math.max(1, Math.trunc(entity.moveSpeedPerTick * (1000 - slow.magnitudePermille) / 1000));
+  const haste = statusActive(entity, 'haste', tick);
+  const slowPermille = slow?.magnitudePermille ?? 0;
+  const hastePermille = haste?.magnitudePermille ?? 0;
+  return Math.max(1, Math.trunc(entity.moveSpeedPerTick * (1000 - slowPermille + hastePermille) / 1000));
 }
 
 function moveEntity(state: SimulationState, entity: SimEntity): void {
@@ -437,12 +468,27 @@ function dealDamage(
   victim: SimEntity,
   amount: number,
   content: AuthoritativeContentPayload,
-): void {
-  if (!validEnemy(attacker, victim) || amount <= 0) return;
+  damageType: AuthoritativeDamageType = 'physical',
+): number {
+  if (!validEnemy(attacker, victim) || amount <= 0) return 0;
   markTowerAggro(state, attacker, victim);
   if (victim.neutral && attacker.kind === 'hero') victim.attackTargetId = attacker.id;
-  victim.hp = Math.max(0, victim.hp - Math.max(0, Math.trunc(amount)));
+  let resolved = Math.max(0, Math.trunc(amount));
+  if (damageType !== 'true') {
+    const rawDefense = damageType === 'physical' ? victim.armor : victim.magicResist;
+    const defense = damageType === 'magic'
+      ? Math.max(0, Math.trunc(rawDefense * (1000 - attacker.magicPenPermille) / 1000))
+      : Math.max(0, rawDefense);
+    resolved = Math.max(1, Math.trunc(resolved * 1000 / (1000 + defense * 10)));
+  }
+  const reduction = statusActive(victim, 'damage-reduction', state.tick);
+  if (reduction) resolved = Math.max(0, Math.trunc(resolved * (1000 - reduction.magnitudePermille) / 1000));
+  const absorbed = Math.min(victim.shieldHp, resolved);
+  victim.shieldHp -= absorbed;
+  const healthDamage = resolved - absorbed;
+  victim.hp = Math.max(0, victim.hp - healthDamage);
   if (victim.hp === 0) killEntity(state, victim, attacker, content);
+  return resolved;
 }
 
 function tryAttack(state: SimulationState, attacker: SimEntity, content: AuthoritativeContentPayload): void {
@@ -463,7 +509,17 @@ function tryAttack(state: SimulationState, attacker: SimEntity, content: Authori
 
   const crit = rollPermille(state.rngState, attacker.critChancePermille);
   state.rngState = crit.state;
-  dealDamage(state, attacker, target, crit.hit ? attacker.attackDamage * 2 : attacker.attackDamage, content);
+  const dealt = dealDamage(
+    state,
+    attacker,
+    target,
+    crit.hit ? attacker.attackDamage * 2 : attacker.attackDamage,
+    content,
+    'physical',
+  );
+  if (dealt > 0 && attacker.lifestealPermille > 0) {
+    attacker.hp = Math.min(attacker.maxHp, attacker.hp + Math.trunc(dealt * attacker.lifestealPermille / 1000));
+  }
   attacker.attackCooldownRemaining = attacker.attackCooldownTicks;
 }
 
@@ -476,6 +532,8 @@ function respawnIfReady(state: SimulationState, entity: SimEntity): void {
   ) return;
   entity.dead = false;
   entity.hp = entity.maxHp;
+  entity.mana = entity.maxMana;
+  entity.shieldHp = 0;
   entity.x = entity.spawnX;
   entity.y = entity.spawnY;
   entity.respawnAtTick = null;
@@ -485,6 +543,12 @@ function respawnIfReady(state: SimulationState, entity: SimEntity): void {
   entity.moveTarget = null;
   entity.statuses = [];
   entity.towerAggroUntilTick = 0;
+}
+
+function regenerateResources(state: SimulationState, entity: SimEntity): void {
+  if (entity.dead || entity.kind !== 'hero' || state.tick === 0 || state.tick % SIM_TICK_RATE !== 0) return;
+  entity.hp = Math.min(entity.maxHp, entity.hp + entity.hpRegenPerSecond);
+  entity.mana = Math.min(entity.maxMana, entity.mana + entity.manaRegenPerSecond);
 }
 
 function nearestEnemy(
@@ -683,93 +747,190 @@ function pointSegmentDistanceSquared(px: number, py: number, ax: number, ay: num
   return dx * dx + dy * dy;
 }
 
-function castGarethQ(
-  state: SimulationState,
-  caster: SimEntity,
-  targetId: EntityId | undefined,
-  content: AuthoritativeContentPayload,
-): boolean {
-  if (!targetId) return false;
-  const target = state.entities[String(targetId)];
-  if (!validEnemy(caster, target)) return false;
-  const q = authoritativeHero('gareth', content).q;
-  const range = q.range + target.radius;
-  if (squaredDistance(caster, target) > range * range) return false;
-
-  const damage = q.damageBase + Math.trunc(caster.attackDamage * q.damageAdPermille / 1000);
-  dealDamage(state, caster, target, damage, content);
-  if (!target.dead) {
-    upsertStatus(target, {
-      kind: q.statusKind,
-      sourceId: caster.id,
-      expiresAtTick: state.tick + q.statusTicks,
-      magnitudePermille: q.statusMagnitudePermille,
-    });
-  }
-  caster.abilityCooldowns.Q = q.cooldownTicks;
-  return true;
+function orderedLivingEntities(state: SimulationState): SimEntity[] {
+  return Object.values(state.entities).filter((entity) => !entity.dead).sort((a, b) => a.id - b.id);
 }
 
-function castLuxanaQ(
+function isValidAbilityTarget(caster: SimEntity, target: SimEntity, ability: AuthoritativeAbilityContent): boolean {
+  if (target.kind === 'ward') return false;
+  if (ability.affectsAllies) return !target.neutral && target.team === caster.team && target.kind === 'hero';
+  return validEnemy(caster, target);
+}
+
+function clampedCastPoint(
   state: SimulationState,
   caster: SimEntity,
-  x: number | undefined,
-  y: number | undefined,
-  content: AuthoritativeContentPayload,
-): boolean {
-  if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+  range: number,
+  x?: number,
+  y?: number,
+): SimVec {
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return { x: caster.x, y: caster.y };
   const direction = normalizedDirection(caster, Number(x), Number(y));
-  if (!direction) return false;
-
-  const q = authoritativeHero('luxana', content).q;
-  const endX = caster.x + direction.x * q.range;
-  const endY = caster.y + direction.y * q.range;
-  const halfWidth = q.lineHalfWidth ?? 1;
-  const candidates = Object.values(state.entities)
-    .filter((target) =>
-      validEnemy(caster, target) &&
-      target.kind !== 'tower' &&
-      pointSegmentDistanceSquared(target.x, target.y, caster.x, caster.y, endX, endY) <=
-        (halfWidth + target.radius) ** 2,
-    )
-    .sort((a, b) => {
-      const da = squaredDistance(caster, a);
-      const db = squaredDistance(caster, b);
-      return da - db || a.id - b.id;
-    });
-
-  const target = candidates[0];
-  if (!target) return false;
-  const damage = q.damageBase + Math.trunc(caster.attackDamage * q.damageAdPermille / 1000);
-  dealDamage(state, caster, target, damage, content);
-  if (!target.dead) {
-    upsertStatus(target, {
-      kind: q.statusKind,
-      sourceId: caster.id,
-      expiresAtTick: state.tick + q.statusTicks,
-      magnitudePermille: q.statusMagnitudePermille,
-    });
-  }
-  caster.abilityCooldowns.Q = q.cooldownTicks;
-  return true;
+  if (!direction || range <= 0) return { x: caster.x, y: caster.y };
+  const distance = Math.sqrt((Number(x) - caster.x) ** 2 + (Number(y) - caster.y) ** 2);
+  const travel = Math.min(distance, range);
+  return {
+    x: clampInt(caster.x + direction.x * travel, caster.radius, state.width - caster.radius),
+    y: clampInt(caster.y + direction.y * travel, caster.radius, state.height - caster.radius),
+  };
 }
 
-function castQ(
+function abilityTargets(
+  state: SimulationState,
+  caster: SimEntity,
+  command: Extract<CoreSimulationCommand, { type: 'cast' }>,
+  ability: AuthoritativeAbilityContent,
+): SimEntity[] {
+  const entities = orderedLivingEntities(state);
+  if (ability.runtime === 'self') {
+    const targets = ability.affectsAllies
+      ? entities.filter((target) => isValidAbilityTarget(caster, target, ability) && squaredDistance(caster, target) <= ability.radius ** 2)
+      : entities.filter((target) => validEnemy(caster, target) && squaredDistance(caster, target) <= ability.radius ** 2);
+    if (ability.healBase > 0 || ability.shieldBase > 0 || ability.hastePermille > 0 || ability.damageReductionPermille > 0) {
+      targets.unshift(caster);
+    }
+    return [...new Map(targets.map((target) => [target.id, target])).values()];
+  }
+
+  if (ability.runtime === 'target' || ability.runtime === 'dash') {
+    const direct = command.targetId === undefined ? undefined : state.entities[String(command.targetId)];
+    if (direct && isValidAbilityTarget(caster, direct, ability)) {
+      const range = ability.range + direct.radius;
+      return squaredDistance(caster, direct) <= range * range ? [direct] : [];
+    }
+    if (!Number.isFinite(command.x) || !Number.isFinite(command.y)) return [];
+    return entities
+      .filter((target) => isValidAbilityTarget(caster, target, ability))
+      .map((target) => ({ target, d2: (target.x - Number(command.x)) ** 2 + (target.y - Number(command.y)) ** 2 }))
+      .filter(({ target, d2 }) => d2 <= (target.radius + 70) ** 2 && squaredDistance(caster, target) <= (ability.range + target.radius) ** 2)
+      .sort((a, b) => a.d2 - b.d2 || a.target.id - b.target.id)
+      .slice(0, 1)
+      .map(({ target }) => target);
+  }
+
+  const point = clampedCastPoint(state, caster, ability.range, command.x, command.y);
+  if (ability.runtime === 'area') {
+    return entities.filter((target) => isValidAbilityTarget(caster, target, ability) && squaredDistance(point, target) <= (ability.radius + target.radius) ** 2);
+  }
+
+  const direction = normalizedDirection(caster, point.x, point.y);
+  if (!direction) return [];
+  const endX = caster.x + direction.x * ability.range;
+  const endY = caster.y + direction.y * ability.range;
+  const candidates = entities
+    .filter((target) => {
+      if (!isValidAbilityTarget(caster, target, ability)) return false;
+      if (ability.runtime === 'cone') {
+        const dx = target.x - caster.x;
+        const dy = target.y - caster.y;
+        const distance = Math.sqrt(dx * dx + dy * dy) || 1;
+        return distance <= ability.range + target.radius && (dx * direction.x + dy * direction.y) / distance >= 0.55;
+      }
+      return pointSegmentDistanceSquared(target.x, target.y, caster.x, caster.y, endX, endY) <=
+        (ability.lineHalfWidth + target.radius) ** 2;
+    })
+    .sort((a, b) => squaredDistance(caster, a) - squaredDistance(caster, b) || a.id - b.id);
+  return ability.pierces || ability.runtime === 'cone' ? candidates : candidates.slice(0, 1);
+}
+
+function applyBeneficialAbility(
+  state: SimulationState,
+  caster: SimEntity,
+  target: SimEntity,
+  ability: AuthoritativeAbilityContent,
+): void {
+  if (ability.healBase > 0) {
+    const heal = ability.healBase + Math.trunc(caster.abilityPower * ability.damageApPermille / 2000);
+    target.hp = Math.min(target.maxHp, target.hp + heal);
+  }
+  if (ability.shieldBase > 0) {
+    target.shieldHp += ability.shieldBase + Math.trunc(caster.abilityPower * ability.damageApPermille / 2000);
+  }
+  if (ability.hastePermille > 0) {
+    upsertStatus(target, { kind: 'haste', sourceId: caster.id, expiresAtTick: state.tick + Math.max(30, ability.statusTicks || 90), magnitudePermille: ability.hastePermille });
+  }
+  if (ability.damageReductionPermille > 0) {
+    upsertStatus(target, { kind: 'damage-reduction', sourceId: caster.id, expiresAtTick: state.tick + Math.max(30, ability.statusTicks || 90), magnitudePermille: ability.damageReductionPermille });
+  }
+}
+
+function castAbility(
   state: SimulationState,
   caster: SimEntity,
   command: Extract<CoreSimulationCommand, { type: 'cast' }>,
   content: AuthoritativeContentPayload,
 ): void {
+  const slot = command.slot;
   if (
     caster.kind !== 'hero' ||
     caster.dead ||
-    caster.abilityCooldowns.Q > 0 ||
+    !caster.heroId ||
+    caster.abilityCooldowns[slot] > 0 ||
     statusActive(caster, 'stun', state.tick) ||
-    command.slot !== 'Q'
+    statusActive(caster, 'silence', state.tick)
   ) return;
+  const ability = authoritativeAbility(caster.heroId, slot, content);
+  if (caster.mana < ability.manaCost) return;
 
-  if (caster.heroId === 'gareth') castGarethQ(state, caster, command.targetId, content);
-  else if (caster.heroId === 'luxana') castLuxanaQ(state, caster, command.x, command.y, content);
+  if (ability.runtime === 'dash') {
+    const point = clampedCastPoint(state, caster, ability.moveDistance, command.x, command.y);
+    caster.x = point.x;
+    caster.y = point.y;
+    caster.moveTarget = null;
+  }
+  const targets = abilityTargets(state, caster, command, ability);
+  const canCastWithoutTarget = ability.runtime === 'self' || ability.runtime === 'area' || ability.runtime === 'dash';
+  if (targets.length === 0 && !canCastWithoutTarget) return;
+
+  const damage = ability.damageBase + ability.damagePerLevel * Math.max(0, caster.level - 1) +
+    Math.trunc(caster.attackDamage * ability.damageAdPermille / 1000) +
+    Math.trunc(caster.abilityPower * ability.damageApPermille / 1000);
+  for (const target of targets) {
+    if (target.id === caster.id || (ability.affectsAllies && target.team === caster.team)) {
+      applyBeneficialAbility(state, caster, target, ability);
+      continue;
+    }
+    if (damage > 0) dealDamage(state, caster, target, damage, content, ability.damageType);
+    if (!target.dead && ability.statusKind) {
+      upsertStatus(target, {
+        kind: ability.statusKind,
+        sourceId: caster.id,
+        expiresAtTick: state.tick + ability.statusTicks,
+        magnitudePermille: ability.statusMagnitudePermille,
+      });
+    }
+  }
+  if (
+    targets.every((target) => target.id !== caster.id) &&
+    (ability.healBase > 0 || ability.shieldBase > 0 || ability.hastePermille > 0 || ability.damageReductionPermille > 0) &&
+    !ability.affectsAllies
+  ) applyBeneficialAbility(state, caster, caster, ability);
+  caster.mana -= ability.manaCost;
+  caster.abilityCooldowns[slot] = ability.cooldownTicks;
+}
+
+function applyItemStats(entity: SimEntity, item: AuthoritativeItemContent, direction: 1 | -1): void {
+  const stats = item.stats;
+  entity.attackDamage += (stats.attackDamage ?? 0) * direction;
+  entity.abilityPower += (stats.abilityPower ?? 0) * direction;
+  entity.armor += (stats.armor ?? 0) * direction;
+  entity.magicResist += (stats.magicResist ?? 0) * direction;
+  entity.magicPenPermille += (stats.magicPenPermille ?? 0) * direction;
+  entity.critChancePermille += (stats.critChancePermille ?? 0) * direction;
+  entity.lifestealPermille += (stats.lifestealPermille ?? 0) * direction;
+  entity.hpRegenPerSecond += (stats.hpRegenPerSecond ?? 0) * direction;
+  entity.manaRegenPerSecond += (stats.manaRegenPerSecond ?? 0) * direction;
+  entity.moveSpeedPerTick += (stats.moveSpeedPerTick ?? 0) * direction;
+  entity.attackSpeedPermille = Math.max(100, entity.attackSpeedPermille + (stats.attackSpeedPermille ?? 0) * direction);
+  entity.attackCooldownTicks = Math.max(5, Math.trunc(entity.baseAttackCooldownTicks * 1000 / entity.attackSpeedPermille));
+  if (stats.maxHp) {
+    entity.maxHp += stats.maxHp * direction;
+    entity.hp = Math.max(1, Math.min(entity.maxHp, entity.hp + stats.maxHp * direction));
+  }
+  if (stats.maxMana) {
+    entity.maxMana += stats.maxMana * direction;
+    entity.mana = Math.max(0, Math.min(entity.maxMana, entity.mana + stats.maxMana * direction));
+  }
 }
 
 function buyItem(
@@ -780,20 +941,31 @@ function buyItem(
   if (entity.kind !== 'hero' || entity.dead) return;
   const item = authoritativeItem(itemId, content);
   if (!item) return;
-  if (entity.inventory.length >= content.rules.maxInventorySlots) return;
   const dx = entity.x - entity.spawnX;
   const dy = entity.y - entity.spawnY;
   if (dx * dx + dy * dy > content.rules.shopRadius * content.rules.shopRadius) return;
-  if (entity.gold < item.cost) return;
-
-  entity.gold -= item.cost;
-  entity.inventory.push(item.id);
-  if (item.stats.attackDamage) entity.attackDamage += item.stats.attackDamage;
-  if (item.stats.maxHp) {
-    entity.maxHp += item.stats.maxHp;
-    entity.hp += item.stats.maxHp;
+  const available = [...entity.inventory];
+  const consumed: number[] = [];
+  let price = item.cost;
+  for (const componentId of item.recipe) {
+    const index = available.findIndex((id, candidate) => id === componentId && !consumed.includes(candidate));
+    if (index < 0) continue;
+    const component = authoritativeItem(componentId, content);
+    if (!component) continue;
+    consumed.push(index);
+    price -= component.cost;
   }
-  if (item.stats.moveSpeedPerTick) entity.moveSpeedPerTick += item.stats.moveSpeedPerTick;
+  const resultingSlots = entity.inventory.length - consumed.length + 1;
+  if (resultingSlots > content.rules.maxInventorySlots || entity.gold < Math.max(0, price)) return;
+
+  entity.gold -= Math.max(0, price);
+  for (const index of [...consumed].sort((a, b) => b - a)) {
+    const component = authoritativeItem(entity.inventory[index], content);
+    if (component) applyItemStats(entity, component, -1);
+    entity.inventory.splice(index, 1);
+  }
+  entity.inventory.push(item.id);
+  applyItemStats(entity, item, 1);
 }
 
 function placeWard(
@@ -914,7 +1086,7 @@ function applyCommand(
       entity.attackTargetId = null;
       break;
     case 'cast':
-      castQ(state, entity, command, content);
+      castAbility(state, entity, command, content);
       break;
     case 'buy':
       buyItem(entity, command.itemId, content);
@@ -932,7 +1104,7 @@ export function createSimulation(
   const width = clampInt(options.width ?? DEFAULT_WIDTH, 512, 100_000);
   const height = clampInt(options.height ?? DEFAULT_HEIGHT, 512, 100_000);
   const state: SimulationState = {
-    version: 3,
+    version: 4,
     contentVersion: options.contentVersion?.trim() || CURRENT_AUTHORITATIVE_CONTENT.contentVersion,
     tick: 0,
     seed: normalizeSeed(options.seed),
@@ -995,6 +1167,7 @@ export function stepSimulation(
     respawnIfReady(state, entity);
     pruneStatuses(entity, state.tick);
     decrementCooldowns(entity);
+    regenerateResources(state, entity);
 
     if (entity.kind === 'minion') updateMinionAI(state, index, entity);
     else if (entity.kind === 'tower') updateTowerAI(state, index, entity);

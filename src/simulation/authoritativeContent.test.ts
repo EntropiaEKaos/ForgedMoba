@@ -19,6 +19,15 @@ test('published authoritative content is stable for identical payloads', () => {
   assert.equal(left.manifest.hash, right.manifest.hash);
 });
 
+test('the complete legacy catalog is published with four deterministic abilities per hero', () => {
+  assert.equal(CURRENT_AUTHORITATIVE_CONTENT.payload.heroes.length, 48);
+  assert.equal(CURRENT_AUTHORITATIVE_CONTENT.payload.items.length, 39);
+  for (const hero of CURRENT_AUTHORITATIVE_CONTENT.payload.heroes) {
+    assert.deepEqual(Object.keys(hero.abilities).sort(), ['E', 'Q', 'R', 'W']);
+    assert.equal(hero.q.key, hero.abilities.Q.key);
+  }
+});
+
 test('gameplay content mutation changes the published hash', () => {
   const original = structuredClone(CURRENT_AUTHORITATIVE_CONTENT.payload);
   const changed = structuredClone(original);

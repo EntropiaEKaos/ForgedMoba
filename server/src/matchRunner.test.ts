@@ -29,7 +29,7 @@ test('runner accepts monotonic commands inside bounded tick window', () => {
   assert.deepEqual(runner.enqueue('blue-1', { type: 'stop', playerId: 'spoof', seq: 2, tick: 0 }), { ok: false, code: 'stale-tick' });
 });
 
-test('runner accepts authoritative Q and still rejects unsupported ability slots', () => {
+test('runner accepts every authoritative ability slot and rejects malformed slots', () => {
   const runner = createRunner();
   assert.deepEqual(
     runner.enqueue('blue-1', { type: 'cast', playerId: 'spoof', seq: 1, tick: 0, slot: 'Q', targetId: 2 }),
@@ -37,10 +37,14 @@ test('runner accepts authoritative Q and still rejects unsupported ability slots
   );
   assert.deepEqual(
     runner.enqueue('blue-1', { type: 'cast', playerId: 'blue-1', seq: 2, tick: 0, slot: 'W', x: 1000, y: 1500 }),
-    { ok: false, code: 'unsupported-command' },
+    { ok: true },
+  );
+  assert.deepEqual(
+    runner.enqueue('blue-1', { type: 'cast', playerId: 'blue-1', seq: 3, tick: 0, slot: 'X' } as never),
+    { ok: false, code: 'invalid-command' },
   );
   runner.advanceOneTick();
-  assert.equal(runner.state.lastAcceptedSeq['blue-1'], 1);
+  assert.equal(runner.state.lastAcceptedSeq['blue-1'], 2);
 });
 
 test('runner emits authoritative hashed snapshots at configured cadence', () => {

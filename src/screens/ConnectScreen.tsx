@@ -134,7 +134,7 @@ export function ConnectScreen({ onReady }: { onReady: () => void }) {
           </div>
         )}
 
-        <p className="text-center text-[12px] text-[#3a5058] mt-4">47 heróis · 40+ itens · Summoner's Rift</p>
+        <p className="text-center text-[12px] text-[#3a5058] mt-4">48 heróis · 39 itens · servidor autoritativo</p>
       </div>
     </div>
   );

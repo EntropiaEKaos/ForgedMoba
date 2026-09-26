@@ -1,7 +1,7 @@
 /**
  * ForgedMoba Online Foundation 0.2
  * --------------------------------
- * Auth + matchmaking + authoritative deterministic single-lane match runners.
+ * Auth + matchmaking + deterministic authoritative MOBA match runners.
  * Accounts and match metadata are still in-memory development infrastructure.
  */
 import express, { type NextFunction, type Request, type Response } from 'express';
@@ -23,7 +23,7 @@ import { RankedDraftRoom } from './rankedDraft.ts';
 
 const PORT = Number(process.env.PORT || 3001);
 const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:5173';
-const SERVER_VERSION = '2.7.0';
+const SERVER_VERSION = '3.0.0';
 const RECONNECT_GRACE_MS = 30_000;
 const RANKED_DRAFT_TIMEOUT_MS = 120_000;
 const CONTENT_VERSION = CURRENT_AUTHORITATIVE_CONTENT.contentVersion;
@@ -325,7 +325,7 @@ app.get('/api/health', (_req, res) => {
   res.json({
     status: 'ok',
     version: SERVER_VERSION,
-    mode: 'ephemeral-authoritative-slice',
+    mode: 'authoritative-full-catalog',
     contentVersion: CONTENT_VERSION,
     tickRate: SIM_TICK_RATE,
     players: io.engine.clientsCount,

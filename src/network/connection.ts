@@ -633,14 +633,18 @@ class ConnectionManager {
     return this.emitGameCommand({ type: 'place-ward', x, y });
   }
 
-  sendCastQ(target: { x?: number; y?: number; targetId?: number }) {
+  sendCast(slot: 'Q' | 'W' | 'E' | 'R', target: { x?: number; y?: number; targetId?: number } = {}) {
     return this.emitGameCommand({
       type: 'cast',
-      slot: 'Q',
+      slot,
       ...(target.x === undefined ? {} : { x: target.x }),
       ...(target.y === undefined ? {} : { y: target.y }),
       ...(target.targetId === undefined ? {} : { targetId: target.targetId }),
     });
+  }
+
+  sendCastQ(target: { x?: number; y?: number; targetId?: number }) {
+    return this.sendCast('Q', target);
   }
 
   getInterpolatedFrame(): InterpolatedFrame | null {

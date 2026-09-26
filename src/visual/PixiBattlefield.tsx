@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { conn } from '../network/connection.ts';
+import { authoritativeAbility } from '../shared/authoritativeContent.ts';
 import type { SimEntity, SimulationState } from '../simulation/types.ts';
 import { CanvasFallbackBattlefield } from './CanvasFallbackBattlefield.tsx';
 import { PixiBattlefieldRuntime } from './PixiBattlefieldRuntime.ts';
@@ -75,20 +76,28 @@ export function PixiBattlefield({ localPlayerId }: { localPlayerId?: string }) {
       if (event.key === '4' || event.key === 'v' || event.key === 'V') {
         conn.sendPlaceWard(pointerWorld.x, pointerWorld.y);
       }
-      if (event.key === 'q' || event.key === 'Q') {
+      const slot = event.key.toUpperCase();
+      if (slot === 'Q' || slot === 'W' || slot === 'E' || slot === 'R') {
         const state = conn.predictedState ?? conn.authoritativeSnapshot?.state ?? null;
         const local = localEntity(state, localPlayerId);
-        if (!local) return;
-        if (local.heroId === 'gareth') {
+        if (!local?.heroId) return;
+        const ability = authoritativeAbility(local.heroId, slot);
+        if (ability.runtime === 'self') {
+          conn.sendCast(slot);
+        } else if (ability.runtime === 'target') {
+          if (ability.affectsAllies) {
+            conn.sendCast(slot, { targetId: local.id });
+            return;
+          }
           const targetId = nearestAttackableEntityId(
             state,
             localPlayerId,
             pointerWorld.x,
             pointerWorld.y,
           );
-          if (targetId !== null) conn.sendCastQ({ targetId });
+          if (targetId !== null) conn.sendCast(slot, { targetId });
         } else {
-          conn.sendCastQ({ x: pointerWorld.x, y: pointerWorld.y });
+          conn.sendCast(slot, { x: pointerWorld.x, y: pointerWorld.y });
         }
       }
     };
