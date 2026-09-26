@@ -164,7 +164,7 @@ The existing game is a feature-rich offline prototype. The migration strategy is
 - [x] repeatable visual-only PRNG.
 - [x] branch CI + PR CI + post-merge main CI green on main @ f52b7759d8f21215df507ca27dd05910286fac09.
 
-## Visual 1.2 — current branch
+## Visual 1.2 — certified and merged
 
 - [x] deterministic environment decoration generator.
 - [x] animated river presentation.
@@ -175,10 +175,29 @@ The existing game is a feature-rich offline prototype. The migration strategy is
 - [x] allied ward vision presentation.
 - [x] environment layers separated from combat/entity layers.
 - [x] visual authority guard covers environment runtime/model.
+- [x] branch CI + PR CI + post-merge main CI green on main @ 29e74ef1889f1fe02adf373b1c01cbbe4c722b68.
+
+## Visual 1.3 — current branch
+
+- [x] Motion-powered match intro and team reveal.
+- [x] Pixi camera intro glide from map center to local hero.
+- [x] authoritative-state cinematic observer for kills/objectives/towers/level-up/respawn.
+- [x] ACE detection for multi-player team wipes.
+- [x] event-priority camera focus with quality-scaled competitive intensity.
+- [x] kill/objective/tower/ACE/level-up/respawn banners.
+- [x] premium victory/defeat result presentation.
+- [x] death screen and authoritative respawn countdown.
+- [x] Q and ward cooldown presentation.
+- [x] reconnect warning animation.
+- [x] Motion shop/HUD entrance transitions.
+- [x] hold-TAB authoritative scoreboard overlay.
+- [x] Ranked Draft Motion transitions and draft-to-match loading presentation.
+- [x] visual-only cinematic tests and boundary guards.
 - [ ] branch CI + PR CI + post-merge main CI certification.
+- [ ] visual proof screenshot artifact when browser preview is available.
 
 ## Visual milestones
-- [ ] 1.3: cinematic entry/result/objective/level-up polish and Motion-powered HUD transitions.
+- [ ] 2.0: production art pipeline, atlases, animated hero rigs, terrain art and skins.
 
 ## Multiplayer milestones
 - [ ] 1.0: production-ready authoritative 5v5 match architecture.
