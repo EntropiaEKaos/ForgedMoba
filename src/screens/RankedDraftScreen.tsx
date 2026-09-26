@@ -14,7 +14,7 @@ const ROLE_LABEL: Record<RankedRole, string> = {
 
 function heroLabel(heroId: string | null): string {
   if (!heroId) return '—';
-  return heroId === 'gareth' ? 'Gareth' : heroId === 'luxana' ? 'Luxana' : heroId;
+  return CURRENT_AUTHORITATIVE_CONTENT.payload.heroes.find((hero) => hero.id === heroId)?.name ?? heroId;
 }
 
 function PlayerRow({ player, isLocal }: { player: DraftPlayerSnapshot; isLocal: boolean }) {
@@ -146,7 +146,7 @@ export function RankedDraftScreen() {
                 >
                   <div className="font-pixel text-[10px] text-[#e8d7a4]">{heroLabel(hero.id)}</div>
                   <div className="text-xs text-[#8398a0] mt-2">
-                    HP {hero.maxHp} · AD {hero.attackDamage} · Q {hero.q.runtime}
+                    {hero.role} · HP {hero.maxHp} · AD {hero.attackDamage} · Q/W/E/R online
                   </div>
                 </motion.button>
               );
@@ -175,7 +175,7 @@ export function RankedDraftScreen() {
           </div>
 
           <div className="mt-4 text-xs text-[#647982]">
-            Nesta fase o catálogo online autoritativo ainda contém Gareth e Luxana; picks duplicados são permitidos até a expansão do conteúdo pós-core.
+            O catálogo completo de 48 heróis está vinculado ao hash da partida. Picks duplicados continuam permitidos para partidas personalizadas e testes de carga.
           </div>
         </section>
       </div>

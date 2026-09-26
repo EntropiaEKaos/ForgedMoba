@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { conn } from '../network/connection.ts';
+import { authoritativeAbility } from '../shared/authoritativeContent.ts';
 import type { SimEntity, SimulationState } from '../simulation/types.ts';
 import { nearestAttackableEntityId } from './targeting.ts';
 
@@ -62,15 +63,23 @@ export function CanvasFallbackBattlefield({ localPlayerId }: { localPlayerId?: s
       if (conn.matchResult) return;
       if (event.key === 's' || event.key === 'S') conn.sendStop();
       if (event.key === '4' || event.key === 'v' || event.key === 'V') conn.sendPlaceWard(pointer.x, pointer.y);
-      if (event.key === 'q' || event.key === 'Q') {
+      const slot = event.key.toUpperCase();
+      if (slot === 'Q' || slot === 'W' || slot === 'E' || slot === 'R') {
         const state = conn.predictedState ?? conn.authoritativeSnapshot?.state ?? null;
         const local = localEntity(state, localPlayerId);
-        if (!local) return;
-        if (local.heroId === 'gareth') {
+        if (!local?.heroId) return;
+        const ability = authoritativeAbility(local.heroId, slot);
+        if (ability.runtime === 'self') {
+          conn.sendCast(slot);
+        } else if (ability.runtime === 'target') {
+          if (ability.affectsAllies) {
+            conn.sendCast(slot, { targetId: local.id });
+            return;
+          }
           const targetId = nearestAttackableEntityId(state, localPlayerId, pointer.x, pointer.y);
-          if (targetId !== null) conn.sendCastQ({ targetId });
+          if (targetId !== null) conn.sendCast(slot, { targetId });
         } else {
-          conn.sendCastQ({ x: pointer.x, y: pointer.y });
+          conn.sendCast(slot, { x: pointer.x, y: pointer.y });
         }
       }
     };

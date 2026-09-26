@@ -13,12 +13,12 @@ function buildProofState(): SimulationState {
     withLane: true,
     withJungle: true,
     players: [
-      { playerId: 'blue-1', team: 0, x: 920, y: 1120, heroId: 'gareth' },
-      { playerId: 'blue-2', team: 0, x: 880, y: 1040, heroId: 'luxana' },
-      { playerId: 'blue-3', team: 0, x: 860, y: 1210, heroId: 'gareth' },
+      { playerId: 'blue-1', team: 0, x: 920, y: 1120, heroId: 'anya' },
+      { playerId: 'blue-2', team: 0, x: 880, y: 1040, heroId: 'ashka' },
+      { playerId: 'blue-3', team: 0, x: 860, y: 1210, heroId: 'yamir' },
       { playerId: 'red-1', team: 1, x: 2050, y: 1100, heroId: 'luxana' },
-      { playerId: 'red-2', team: 1, x: 2110, y: 1020, heroId: 'gareth' },
-      { playerId: 'red-3', team: 1, x: 2140, y: 1200, heroId: 'luxana' },
+      { playerId: 'red-2', team: 1, x: 2110, y: 1020, heroId: 'rizar' },
+      { playerId: 'red-3', team: 1, x: 2140, y: 1200, heroId: 'blitz' },
     ],
   });
 
@@ -33,7 +33,7 @@ function buildProofState(): SimulationState {
       entity.gold = entity.team === 0 ? 1320 : 1180;
       entity.cs = entity.team === 0 ? 42 : 37;
       if (entity.ownerPlayerId === 'blue-1') {
-        entity.inventory = ['longsword', 'ruby', 'boots'];
+        entity.inventory = ['infinityedge', 'vampscepter', 'boots'];
       }
     }
   }
@@ -115,7 +115,7 @@ export function VisualProofScreen() {
         localTeam={0}
         mode="skirmish3v3"
         serverTickRate={30}
-        matchId="visual-proof-2.0"
+        matchId="visual-proof-3.0"
         networkMetrics={{
           rttMs: 24.6,
           jitterMs: 2.8,
@@ -130,7 +130,7 @@ export function VisualProofScreen() {
         matchResult={null}
       />
       <CinematicHud
-        matchId="visual-proof-2.0"
+        matchId="visual-proof-3.0"
         mode="skirmish3v3"
         localPlayerId="blue-1"
         localTeam={0}
@@ -141,7 +141,7 @@ export function VisualProofScreen() {
       />
 
       <div className="pointer-events-none absolute left-1/2 top-[58px] z-20 -translate-x-1/2 rounded-full border border-[#6b5a30] bg-[#090e12]/72 px-4 py-1.5 text-[9px] uppercase tracking-[.24em] text-[#d5c179] backdrop-blur-sm">
-        Visual 2.2 · PixiJS Ultra · HUD Art Pass
+        Visual 3.0 · PixiJS Ultra · Catálogo Autoritativo Completo
       </div>
     </div>
   );

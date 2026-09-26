@@ -54,7 +54,10 @@ function eventKey(event: CombatFxEvent): string {
 }
 
 function eventColor(event: CombatFxEvent): number {
-  if (event.type === 'q-cast') return event.heroId === 'gareth' ? 0xffc34d : 0x71d8ff;
+  if (event.type === 'ability-cast') return ({
+    blade: 0xffd487, fire: 0xff633f, frost: 0x7ce4ff, arcane: 0xc181ff,
+    nature: 0x78db79, shadow: 0x9858df, light: 0xffe985, tech: 0x5ee8f4,
+  } as const)[event.visualTag];
   if (event.type === 'status-impact') {
     if (event.status === 'root') return 0x9a70ff;
     if (event.status === 'stun') return 0xffe45e;
@@ -213,10 +216,11 @@ export class CombatFxRuntime {
       return;
     }
 
-    if (event.type === 'q-cast') {
-      this.spawnBurst(event.x, event.y, color, Math.ceil(16 * multiplier), 145, 680, fxSeed(event));
-      this.spawnRing(event.x, event.y, 18, event.heroId === 'gareth' ? 95 : 125, 420, color);
-      this.shakeEnergy = Math.min(10, this.shakeEnergy + 1.3);
+    if (event.type === 'ability-cast') {
+      const ultimate = event.slot === 'R';
+      this.spawnBurst(event.x, event.y, color, Math.ceil((ultimate ? 30 : 16) * multiplier), ultimate ? 220 : 145, ultimate ? 980 : 680, fxSeed(event));
+      this.spawnRing(event.x, event.y, ultimate ? 26 : 18, ultimate ? 180 : 110, ultimate ? 720 : 420, color);
+      this.shakeEnergy = Math.min(14, this.shakeEnergy + (ultimate ? 4.6 : 1.3));
       return;
     }
 

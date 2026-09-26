@@ -3,7 +3,13 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import type { NetworkMetricsSnapshot } from '../network/telemetry.ts';
 import type { MatchMode } from '../shared/protocol.ts';
 import type { SimEntity, SimulationState } from '../simulation/types.ts';
-import { CURRENT_AUTHORITATIVE_CONTENT } from '../shared/authoritativeContent.ts';
+import {
+  CURRENT_AUTHORITATIVE_CONTENT,
+  authoritativeHero,
+  type AuthoritativeAbilityContent,
+  type AuthoritativeItemContent,
+  type AuthoritativeVisualTag,
+} from '../shared/authoritativeContent.ts';
 import { conn } from '../network/connection.ts';
 import { CinematicObserver, type CinematicEvent } from './cinematicModel.ts';
 
@@ -21,20 +27,60 @@ interface PremiumGameHudProps {
   matchResult: { winner: 0 | 1 | null } | null;
 }
 
-const portraitStyle = (heroId: string | null): CSSProperties => ({
-  backgroundImage: heroId ? `url(/assets/art/v2/heroes/${heroId}-sheet.svg)` : undefined,
-  backgroundRepeat: 'no-repeat',
-  backgroundSize: '400% 100%',
-  backgroundPosition: '0% 50%',
-});
+const portraitStyle = (heroId: string | null): CSSProperties => {
+  if (!heroId) return {};
+  if (heroId === 'gareth' || heroId === 'luxana') return {
+    backgroundImage: `url(/assets/art/v2/heroes/${heroId}-sheet.svg)`,
+    backgroundRepeat: 'no-repeat',
+    backgroundSize: '400% 100%',
+    backgroundPosition: '0% 50%',
+  };
+  const hero = authoritativeHero(heroId);
+  return {
+    background: `radial-gradient(circle at 50% 30%, ${hero.visual.secondary} 0 18%, transparent 19%), linear-gradient(135deg, ${hero.visual.accent}, ${hero.visual.primary} 48%, #071016 49%)`,
+  };
+};
 
 const modeLabel = (mode: MatchMode) =>
   mode === 'duel1v1' ? 'DUEL' : mode === 'skirmish3v3' ? 'SKIRMISH 3V3' : 'RANKED 5V5';
 
-const abilityIcon = (name: 'gareth-q' | 'luxana-q' | 'locked-w' | 'locked-e' | 'locked-r' | 'ward') =>
-  '/assets/ui/v2/abilities/' + name + '.svg';
+const TAG_COLORS: Record<AuthoritativeVisualTag, [string, string]> = {
+  blade: ['#f1d9a1', '#805228'], fire: ['#ffd06a', '#a92f19'], frost: ['#d9f6ff', '#327aa2'],
+  arcane: ['#efc9ff', '#6541a4'], nature: ['#c9f39d', '#397544'], shadow: ['#dcadff', '#2b153f'],
+  light: ['#fff4af', '#b77c20'], tech: ['#9df5ff', '#315f78'],
+};
 
-const itemIcon = (id: string) => '/assets/ui/v2/items/' + id + '.svg';
+function svgData(primary: string, secondary: string, glyph: string): string {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96"><defs><radialGradient id="g"><stop stop-color="${primary}"/><stop offset="1" stop-color="${secondary}"/></radialGradient></defs><rect width="96" height="96" rx="16" fill="#071016"/><path d="M48 7 82 27 76 70 48 89 20 70 14 27Z" fill="url(#g)" stroke="${primary}" stroke-width="3"/><circle cx="48" cy="48" r="22" fill="none" stroke="#fff" stroke-opacity=".32" stroke-width="3"/><text x="48" y="58" text-anchor="middle" font-family="sans-serif" font-weight="900" font-size="28" fill="#fff">${glyph}</text></svg>`;
+  return 'data:image/svg+xml,' + encodeURIComponent(svg);
+}
+
+function abilityIcon(ability: AuthoritativeAbilityContent): string {
+  if (ability.slot === 'Q' && (ability.key === 'decisive' || ability.key === 'lightbinding')) {
+    return `/assets/ui/v2/abilities/${ability.key === 'decisive' ? 'gareth-q' : 'luxana-q'}.svg`;
+  }
+  const [primary, secondary] = TAG_COLORS[ability.visualTag];
+  return svgData(primary, secondary, ability.slot);
+}
+
+function itemIcon(item: AuthoritativeItemContent): string {
+  if (['longsword', 'ruby', 'boots', 'pickaxe'].includes(item.id)) return '/assets/ui/v2/items/' + item.id + '.svg';
+  const glyph = item.stats.attackDamage ? '⚔' : item.stats.abilityPower ? '✦' : item.stats.armor || item.stats.magicResist ? '◆' : item.stats.moveSpeedPerTick ? '➤' : '◈';
+  const primary = item.tier === 3 ? '#ffe278' : item.tier === 2 ? '#91d9ff' : '#c5d0d4';
+  return svgData(primary, item.tier === 3 ? '#6e3b20' : '#273e4b', glyph);
+}
+
+function itemPrice(item: AuthoritativeItemContent, inventory: readonly string[], catalog: readonly AuthoritativeItemContent[]): number {
+  const available = [...inventory];
+  let price = item.cost;
+  for (const componentId of item.recipe) {
+    const index = available.indexOf(componentId);
+    if (index < 0) continue;
+    price -= catalog.find((candidate) => candidate.id === componentId)?.cost ?? 0;
+    available[index] = '__used__';
+  }
+  return Math.max(0, price);
+}
 
 function heroesOf(state: SimulationState | null): SimEntity[] {
   if (!state) return [];
@@ -232,7 +278,8 @@ export function PremiumGameHud({
   const blue = heroes.filter((hero) => hero.team === 0);
   const red = heroes.filter((hero) => hero.team === 1);
   const local = heroes.find((hero) => hero.ownerPlayerId === localPlayerId) ?? null;
-  const qCd = cdSeconds(local?.abilityCooldowns.Q ?? 0, serverTickRate);
+  const localContent = local?.heroId ? authoritativeHero(local.heroId) : null;
+  const abilities = localContent ? (['Q', 'W', 'E', 'R'] as const).map((slot) => localContent.abilities[slot]) : [];
   const wardCd = cdSeconds(local?.wardCooldownRemaining ?? 0, serverTickRate);
   const items = CURRENT_AUTHORITATIVE_CONTENT.payload.items;
   const maxSlots = CURRENT_AUTHORITATIVE_CONTENT.payload.rules.maxInventorySlots;
@@ -240,8 +287,6 @@ export function PremiumGameHud({
     playerId,
     seconds: Math.max(0, Math.ceil((deadline - Date.now()) / 1000)),
   }));
-
-  const qIcon = abilityIcon(local?.heroId === 'gareth' ? 'gareth-q' : 'luxana-q');
 
   return (
     <div className="pointer-events-none absolute inset-0 z-20 select-none" data-hud-tier="forged-premium-2">
@@ -330,16 +375,16 @@ export function PremiumGameHud({
                 <motion.div className="h-full bg-gradient-to-r from-[#177947] via-[#35af70] to-[#70dea0]" animate={{ width: hpPct(local) + '%' }} />
               </div>
               <div className="mt-1 flex justify-between text-[9px] text-[#90a9b2]"><span>{Math.round(local?.hp ?? 0)} / {Math.round(local?.maxHp ?? 0)} HP</span><span>{local?.cs ?? 0} CS</span></div>
-              <div className="mt-3 h-[6px] overflow-hidden bg-black/70"><div className="h-full w-[64%] bg-gradient-to-r from-[#4776a3] to-[#7fb9d7]" /></div>
-              <div className="mt-1 text-[7px] uppercase tracking-[.14em] text-[#536c76]">experience</div>
+              <div className="mt-3 h-[6px] overflow-hidden bg-black/70"><div className="h-full bg-gradient-to-r from-[#4776a3] to-[#7fb9d7]" style={{ width: `${local?.maxMana ? local.mana / local.maxMana * 100 : 0}%` }} /></div>
+              <div className="mt-1 text-[7px] uppercase tracking-[.14em] text-[#536c76]">{local?.maxMana ? `${local.mana} / ${local.maxMana} mana` : 'resource free'}</div>
             </div>
           </div>
 
-          <Ability keyLabel="Q" name={local?.heroId === 'gareth' ? 'Judgment' : 'Prism'} cooldown={qCd} accent="#69d4ff" iconSrc={qIcon} />
-          <Ability keyLabel="W" name="Locked" cooldown={0} accent="#58656b" iconSrc={abilityIcon('locked-w')} locked />
-          <Ability keyLabel="E" name="Locked" cooldown={0} accent="#58656b" iconSrc={abilityIcon('locked-e')} locked />
-          <Ability keyLabel="R" name="Ultimate" cooldown={0} accent="#b8923e" iconSrc={abilityIcon('locked-r')} locked />
-          <Ability keyLabel="4" name="Ward" cooldown={wardCd} accent="#e5c866" iconSrc={abilityIcon('ward')} />
+          {abilities.map((ability) => {
+            const [accent] = TAG_COLORS[ability.visualTag];
+            return <Ability key={ability.slot} keyLabel={ability.slot} name={ability.name} cooldown={cdSeconds(local?.abilityCooldowns[ability.slot] ?? 0, serverTickRate)} accent={accent} iconSrc={abilityIcon(ability)} />;
+          })}
+          <Ability keyLabel="4" name="Ward" cooldown={wardCd} accent="#e5c866" iconSrc="/assets/ui/v2/abilities/ward.svg" />
 
           <div className="ml-4">
             <div className="mb-1 text-center font-pixel text-[7px] tracking-[.18em] text-[#677b83]">INVENTORY</div>
@@ -351,7 +396,7 @@ export function PremiumGameHud({
                   <div key={index} className="relative grid h-[48px] w-[48px] place-items-center overflow-hidden border border-[#4f5b5e] bg-[linear-gradient(145deg,#101a1f,#070b0e)] shadow-inner" title={item?.name ?? 'empty'}>
                     {item ? (
                       <>
-                        <img src={itemIcon(item.id)} alt="" className="h-full w-full object-cover" />
+                        <img src={itemIcon(item)} alt="" className="h-full w-full object-cover" />
                         <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,.08),transparent_45%)]" />
                         <div className="absolute inset-x-0 bottom-0 h-1 bg-[#d6b952]" />
                       </>
@@ -396,9 +441,11 @@ export function PremiumGameHud({
               <div><div className="font-pixel text-[10px] text-[#f0d36d]">FORGE SHOP</div><div className="mt-1 text-[9px] text-[#677d86]">authoritative purchase terminal</div></div>
               <div className="font-pixel text-[15px] text-[#ffe48a]">{local?.gold ?? 0}g</div>
             </div>
-            <div className="mt-4 grid grid-cols-2 gap-2">
+            <div className="mt-4 grid max-h-[48vh] grid-cols-2 gap-2 overflow-y-auto pr-1">
               {items.map((item) => {
-                const disabled = Boolean(matchResult) || !local || local.gold < item.cost || local.inventory.length >= maxSlots;
+                const price = itemPrice(item, local?.inventory ?? [], items);
+                const ownedComponents = item.recipe.filter((component) => local?.inventory.includes(component)).length;
+                const disabled = Boolean(matchResult) || !local || local.gold < price || local.inventory.length - ownedComponents >= maxSlots;
                 return (
                   <motion.button
                     key={item.id}
@@ -409,10 +456,10 @@ export function PremiumGameHud({
                     className="relative overflow-hidden border border-[#554724] bg-[linear-gradient(145deg,#1d1810,#0b1115)] p-3 text-left disabled:opacity-30"
                   >
                     <div className="flex items-center gap-3">
-                      <img src={itemIcon(item.id)} alt="" className="h-12 w-12 border border-[#66582f] object-cover shadow-[0_0_18px_rgba(205,177,81,.08)]" />
+                      <img src={itemIcon(item)} alt="" className="h-12 w-12 border border-[#66582f] object-cover shadow-[0_0_18px_rgba(205,177,81,.08)]" />
                       <div className="min-w-0 flex-1">
                         <div className="truncate font-pixel text-[8px] text-[#eadb9f]">{item.name}</div>
-                        <div className="mt-2 flex justify-between text-[10px]"><span className="text-[#627982]">EQUIP</span><span className="text-[#e8c860]">{item.cost}g</span></div>
+                        <div className="mt-2 flex justify-between text-[10px]"><span className="text-[#627982]">T{item.tier}{item.recipe.length ? ` · ${item.recipe.length} parts` : ''}</span><span className="text-[#e8c860]">{price}g</span></div>
                       </div>
                     </div>
                   </motion.button>

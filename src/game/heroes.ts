@@ -349,7 +349,7 @@ export const HEROES: HeroDef[] = [
 ];
 
 // Importa e mescla os 25 heróis originais (conceitos únicos, não-LoL)
-import { ORIGINAL_HEROES } from './heroes-original';
+import { ORIGINAL_HEROES } from './heroes-original.ts';
 HEROES.push(...ORIGINAL_HEROES);
 
 export const HERO_BY_ID: Record<string, HeroDef> = Object.fromEntries(HEROES.map(h => [h.id, h]));

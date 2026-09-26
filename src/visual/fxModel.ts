@@ -1,9 +1,10 @@
 import type { SimEntity, SimulationState } from '../simulation/types.ts';
+import { authoritativeAbility, type AuthoritativeVisualTag } from '../shared/authoritativeContent.ts';
 
 export type CombatFxEvent =
   | { type: 'damage'; tick: number; entityId: number; x: number; y: number; amount: number }
   | { type: 'death'; tick: number; entityId: number; x: number; y: number; kind: SimEntity['kind'] }
-  | { type: 'q-cast'; tick: number; entityId: number; x: number; y: number; heroId: SimEntity['heroId'] }
+  | { type: 'ability-cast'; tick: number; entityId: number; x: number; y: number; heroId: SimEntity['heroId']; slot: 'Q' | 'W' | 'E' | 'R'; visualTag: AuthoritativeVisualTag }
   | {
       type: 'status-impact';
       tick: number;
@@ -13,7 +14,7 @@ export type CombatFxEvent =
       sourceY: number;
       x: number;
       y: number;
-      status: 'slow' | 'root' | 'stun';
+      status: 'slow' | 'root' | 'stun' | 'silence';
     }
   | { type: 'objective'; tick: number; team: 0 | 1; x: number; y: number };
 
@@ -24,7 +25,7 @@ export interface VisualEntityProbe {
   y: number;
   kind: SimEntity['kind'];
   heroId: SimEntity['heroId'];
-  qCooldown: number;
+  abilityCooldowns: SimEntity['abilityCooldowns'];
   statuses: { kind: string; sourceId: number }[];
 }
 
@@ -44,7 +45,7 @@ export function captureVisualProbe(state: SimulationState): VisualStateProbe {
       y: entity.y,
       kind: entity.kind,
       heroId: entity.heroId,
-      qCooldown: entity.abilityCooldowns.Q,
+      abilityCooldowns: { ...entity.abilityCooldowns },
       statuses: entity.statuses
         .map((status) => ({ kind: status.kind, sourceId: status.sourceId }))
         .sort((a, b) => a.kind.localeCompare(b.kind) || a.sourceId - b.sourceId),
@@ -92,21 +93,26 @@ export function deriveCombatFx(
       });
     }
 
-    if (now.kind === 'hero' && now.qCooldown > before.qCooldown + 1) {
-      events.push({
-        type: 'q-cast',
-        tick: current.tick,
-        entityId: id,
-        x: now.x,
-        y: now.y,
-        heroId: now.heroId,
-      });
+    if (now.kind === 'hero' && now.heroId) {
+      for (const slot of ['Q', 'W', 'E', 'R'] as const) {
+        if (now.abilityCooldowns[slot] <= before.abilityCooldowns[slot] + 1) continue;
+        events.push({
+          type: 'ability-cast',
+          tick: current.tick,
+          entityId: id,
+          x: now.x,
+          y: now.y,
+          heroId: now.heroId,
+          slot,
+          visualTag: authoritativeAbility(now.heroId, slot).visualTag,
+        });
+      }
     }
 
     const beforeStatuses = new Set(before.statuses.map((status) => status.kind + ':' + status.sourceId));
     for (const status of now.statuses) {
       if (beforeStatuses.has(status.kind + ':' + status.sourceId)) continue;
-      if (status.kind === 'slow' || status.kind === 'root' || status.kind === 'stun') {
+      if (status.kind === 'slow' || status.kind === 'root' || status.kind === 'stun' || status.kind === 'silence') {
         const source = current.entities[status.sourceId];
         events.push({
           type: 'status-impact',

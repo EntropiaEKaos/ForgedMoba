@@ -275,7 +275,57 @@ test('Q runtime consumes published ability values instead of hidden constants', 
 
   const expected = gareth.q.damageBase +
     Math.trunc(state.entities['1'].attackDamage * gareth.q.damageAdPermille / 1000);
-  assert.equal(hpBefore - target.hp, expected);
+  const mitigated = Math.max(1, Math.trunc(expected * 1000 / (1000 + target.armor * 10)));
+  assert.equal(hpBefore - target.hp, mitigated);
+});
+
+test('Q/W/E/R share the authoritative executor and consume published cooldowns', () => {
+  const state = createSimulation({
+    ...options,
+    players: [
+      { playerId: 'blue-1', team: 0 as const, x: 1000, y: 1000, heroId: 'gareth' },
+      { playerId: 'red-1', team: 1 as const, x: 1060, y: 1000, heroId: 'luxana' },
+    ],
+  });
+  const commands = [
+    { type: 'cast', playerId: 'blue-1', seq: 1, tick: 0, slot: 'Q', targetId: 2 },
+    { type: 'cast', playerId: 'blue-1', seq: 2, tick: 0, slot: 'W' },
+    { type: 'cast', playerId: 'blue-1', seq: 3, tick: 0, slot: 'E', x: 1000, y: 1000 },
+    { type: 'cast', playerId: 'blue-1', seq: 4, tick: 0, slot: 'R', targetId: 2 },
+  ] as const;
+  stepSimulation(state, commands);
+  for (const slot of ['Q', 'W', 'E', 'R'] as const) assert.ok(state.entities['1'].abilityCooldowns[slot] > 0);
+});
+
+test('every migrated hero ability can execute through the deterministic server runtime', () => {
+  for (const publishedHero of CURRENT_AUTHORITATIVE_CONTENT.payload.heroes) {
+    for (const slot of ['Q', 'W', 'E', 'R'] as const) {
+      const ability = publishedHero.abilities[slot];
+      const state = createSimulation({
+        seed: 9000 + slot.charCodeAt(0),
+        players: [
+          { playerId: 'caster', team: 0, x: 1000, y: 1000, heroId: publishedHero.id },
+          { playerId: 'ally', team: 0, x: 1030, y: 1000, heroId: 'gareth' },
+          { playerId: 'enemy', team: 1, x: 1060, y: 1000, heroId: 'luxana' },
+        ],
+      });
+      const targetId = ability.affectsAllies ? 2 : 3;
+      stepSimulation(state, [{
+        type: 'cast',
+        playerId: 'caster',
+        seq: 1,
+        tick: 0,
+        slot,
+        targetId,
+        x: 1200,
+        y: 1000,
+      }]);
+      assert.ok(
+        state.entities['1'].abilityCooldowns[slot] > 0,
+        `${publishedHero.id}.${slot} (${ability.key}) did not execute`,
+      );
+    }
+  }
 });
 
 

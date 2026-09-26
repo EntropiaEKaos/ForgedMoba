@@ -1,6 +1,6 @@
 # 🎮 Pixel Rift — Documentação Técnica
 
-MOBA Cartoon 5v5 super expressivo com **47 heróis jogáveis**, 40+ itens com receitas, sistema de feitiços e runas pré-partida, wards e Fog of War dinâmica, e mecânicas lendárias de Dota (Buyback, Deny de minions e Runas do Rio). O projeto conta com persistência de dados local (carreira, maestria, histórico de 50 partidas, skins), console administrativo embutido (Ctrl+Shift+M) e suporte online (JWT + Socket.io) com fallback offline inteligente.
+MOBA Cartoon 5v5 super expressivo com **48 heróis jogáveis**, **39 itens** com receitas, sistema de feitiços e runas pré-partida, wards e Fog of War dinâmica. O catálogo de heróis, Q/W/E/R, mana, resistências, regeneração e economia de itens agora é compilado em um pacote imutável e executado pelo servidor determinístico. O projeto mantém o protótipo local para comparação enquanto o multiplayer usa JWT + Socket.io, prediction/reconciliation e snapshots com hash.
 
 ## Arquitetura Atual
 
