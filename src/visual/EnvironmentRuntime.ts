@@ -6,6 +6,7 @@ import {
   Rectangle,
   Texture,
 } from 'pixi.js';
+import { GlowFilter } from 'pixi-filters/glow';
 import type { SimulationState } from '../simulation/types.ts';
 import {
   environmentDecorBudget,
@@ -40,6 +41,13 @@ export class EnvironmentRuntime {
   private readonly river = new Graphics();
   private readonly decorLayer = new Container();
   private readonly auraLayer = new Graphics();
+  private readonly auraGlow = new GlowFilter({
+    distance: 18,
+    outerStrength: 1.1,
+    innerStrength: 0.15,
+    color: 0xffffff,
+    quality: 0.18,
+  });
   private readonly decorNodes = new Map<number, Graphics>();
   private ambient: AmbientParticle[] = [];
   private decor: EnvironmentDecor[] = [];
@@ -47,6 +55,7 @@ export class EnvironmentRuntime {
   private elapsed = 0;
 
   constructor() {
+    this.auraLayer.filters = [this.auraGlow];
     this.background.addChild(this.river);
     this.background.addChild(this.decorLayer);
     this.foreground.addChild(this.auraLayer);
@@ -59,6 +68,7 @@ export class EnvironmentRuntime {
     quality: VisualQuality,
   ): void {
     this.elapsed += Math.max(0, Math.min(50, deltaMs)) / 1000;
+    this.auraGlow.enabled = quality === 'high' || quality === 'ultra';
     this.ensureWorld(state.width, state.height, quality);
     this.animateRiver(state.width, state.height);
     this.animateDecor(quality);
@@ -222,6 +232,26 @@ export class EnvironmentRuntime {
           .fill({ color: 0x9b5de5, alpha: quality === 'low' ? 0.045 : 0.085 })
           .circle(entity.x, entity.y, Math.max(58, entity.radius * 3.1) * pulse)
           .stroke({ color: 0xc59aff, alpha: 0.18, width: 2 });
+      }
+
+      if (entity.kind === 'tower' && quality !== 'low') {
+        const towerColor = entity.team === 0 ? 0x55bdff : 0xff6868;
+        const pulse = 1 + Math.sin(this.elapsed * 1.45 + entity.id * 0.7) * 0.06;
+        this.auraLayer
+          .ellipse(entity.x, entity.y + entity.radius * 0.7, entity.radius * 1.75 * pulse, entity.radius * 0.72 * pulse)
+          .fill({ color: towerColor, alpha: quality === 'ultra' ? 0.055 : 0.035 })
+          .ellipse(entity.x, entity.y + entity.radius * 0.7, entity.radius * 2.05 * pulse, entity.radius * 0.88 * pulse)
+          .stroke({ color: towerColor, alpha: 0.14, width: 2 });
+      }
+
+      if (entity.kind === 'hero' && entity.ownerPlayerId === localPlayerId && quality !== 'low') {
+        const radius = Math.max(36, entity.radius * 2.25);
+        const pulse = 1 + Math.sin(this.elapsed * 3.1) * 0.05;
+        this.auraLayer
+          .circle(entity.x, entity.y + 4, radius * pulse)
+          .stroke({ color: 0xffdc70, alpha: quality === 'ultra' ? 0.18 : 0.11, width: 2 })
+          .circle(entity.x, entity.y + 4, radius * 1.28 * pulse)
+          .stroke({ color: 0x78cfff, alpha: quality === 'ultra' ? 0.075 : 0.045, width: 1.5 });
       }
 
       if (entity.kind === 'monster' && quality !== 'low') {
