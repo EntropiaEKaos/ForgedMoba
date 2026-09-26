@@ -9,6 +9,7 @@ import {
   type VisualQuality,
 } from './quality.ts';
 import { nearestAttackableEntityId } from './targeting.ts';
+import type { SkinVisualSelection } from './skinVisualContract.ts';
 
 function localEntity(state: SimulationState | null, playerId: string | undefined): SimEntity | null {
   if (!state || !playerId) return null;
@@ -17,7 +18,13 @@ function localEntity(state: SimulationState | null, playerId: string | undefined
     .sort((a, b) => a.id - b.id)[0] ?? null;
 }
 
-export function PixiBattlefield({ localPlayerId }: { localPlayerId?: string }) {
+export function PixiBattlefield({
+  localPlayerId,
+  skinVisuals,
+}: {
+  localPlayerId?: string;
+  skinVisuals?: Record<string, SkinVisualSelection>;
+}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const runtimeRef = useRef<PixiBattlefieldRuntime | null>(null);
   const [quality, setQuality] = useState<VisualQuality>(() => readVisualQuality());
@@ -101,6 +108,7 @@ export function PixiBattlefield({ localPlayerId }: { localPlayerId?: string }) {
           interpolated: conn.getInterpolatedFrame(),
           localPlayerId,
           quality: qualityRef.current,
+          skinVisuals,
         });
       }
       raf = requestAnimationFrame(render);
@@ -134,7 +142,7 @@ export function PixiBattlefield({ localPlayerId }: { localPlayerId?: string }) {
       runtime.destroy();
       if (runtimeRef.current === runtime) runtimeRef.current = null;
     };
-  }, [localPlayerId]);
+  }, [localPlayerId, skinVisuals]);
 
   if (fallbackReason) {
     return (
