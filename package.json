@@ -18,7 +18,7 @@
     "server:typecheck": "npm --prefix server run typecheck",
     "server:test": "npm --prefix server run test",
     "test:visual": "node --test --experimental-strip-types src/visual/*.test.ts src/visual/art/*.test.ts",
-    "lint:visual-boundaries": "node scripts/check-visual-boundaries.mjs src/visual/PixiBattlefieldRuntime.ts src/visual/PixiBattlefield.tsx src/visual/CanvasFallbackBattlefield.tsx src/visual/CombatFxRuntime.ts src/visual/fxModel.ts src/visual/EnvironmentRuntime.ts src/visual/environmentModel.ts src/visual/cinematicModel.ts src/visual/CinematicHud.tsx src/visual/ScoreboardOverlay.tsx src/visual/art/ArtAssetRegistry.ts src/visual/art/types.ts src/visual/PremiumGameHud.tsx",
+    "lint:visual-boundaries": "node scripts/check-visual-boundaries.mjs src/visual/PixiBattlefieldRuntime.ts src/visual/PixiBattlefield.tsx src/visual/CanvasFallbackBattlefield.tsx src/visual/CombatFxRuntime.ts src/visual/fxModel.ts src/visual/EnvironmentRuntime.ts src/visual/environmentModel.ts src/visual/cinematicModel.ts src/visual/CinematicHud.tsx src/visual/ScoreboardOverlay.tsx src/visual/art/ArtAssetRegistry.ts src/visual/art/types.ts src/visual/PremiumGameHud.tsx src/visual/capabilityRegistry.ts src/visual/visualEventBus.ts src/visual/energyPulseFilter.ts src/visual/legacyVisualCatalog.ts src/visual/skinVisualContract.ts src/visual/skeletalAnimationContract.ts",
     "lint:art-assets": "node scripts/validate-art-assets.mjs"
   },
   "dependencies": {
