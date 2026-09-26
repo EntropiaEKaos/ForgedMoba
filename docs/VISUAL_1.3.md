@@ -90,3 +90,31 @@ The same gates must pass on the PR merge-ref and again on the merged `main` SHA.
 ## Visual proof
 
 When an accessible browser preview is available, the branch should produce real screenshots from the running renderer. Screenshots are documentation evidence only; they are never used as a substitute for automated correctness gates.
+
+
+## Certified release
+
+Visual 1.3 was merged through PR #14 and certified on:
+
+`main @ 79db8ce62c9c82550242a0d538ee86730402f1cb`
+
+Certification sequence:
+
+- feature branch CI: green;
+- PR merge-ref CI: green;
+- post-merge `main` CI: green;
+- strict TypeScript: green;
+- 100k deterministic simulation suite: green;
+- network client suite: green;
+- visual unit suite: green;
+- production build: green;
+- authoritative server tests: green;
+- realistic concurrent 5v5 load probe: green.
+
+### Visual proof evidence
+
+The Visual 1.3 branch and PR CI both launched the built application with Vite preview, opened the deterministic route `?visual-proof=cinematic` in real Chromium, and captured `visual-proof-cinematic.png`.
+
+The proof scene demonstrates the actual PixiJS + Motion runtime and is generated from the running build rather than from a mocked or generated marketing image.
+
+The screenshot is intentionally an ephemeral CI artifact; the deterministic proof route remains in the application so the evidence can be regenerated on future visual branches.
