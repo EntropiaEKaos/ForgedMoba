@@ -177,7 +177,7 @@ The existing game is a feature-rich offline prototype. The migration strategy is
 - [x] visual authority guard covers environment runtime/model.
 - [x] branch CI + PR CI + post-merge main CI green on main @ 29e74ef1889f1fe02adf373b1c01cbbe4c722b68.
 
-## Visual 1.3 — current branch
+## Visual 1.3 — certified and merged
 
 - [x] Motion-powered match intro and team reveal.
 - [x] Pixi camera intro glide from map center to local hero.
@@ -193,8 +193,8 @@ The existing game is a feature-rich offline prototype. The migration strategy is
 - [x] hold-TAB authoritative scoreboard overlay.
 - [x] Ranked Draft Motion transitions and draft-to-match loading presentation.
 - [x] visual-only cinematic tests and boundary guards.
-- [ ] branch CI + PR CI + post-merge main CI certification.
-- [ ] visual proof screenshot artifact when browser preview is available.
+- [x] branch CI + PR CI + post-merge main CI green on main @ 79db8ce62c9c82550242a0d538ee86730402f1cb.
+- [x] Chromium visual proof captured in branch and PR CI as `visual-proof-cinematic`.
 
 ## Visual milestones
 - [ ] 2.0: production art pipeline, atlases, animated hero rigs, terrain art and skins.
