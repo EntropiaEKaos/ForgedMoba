@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createSimulation, stepSimulation } from '../simulation/core.ts';
 import type { SimulationState } from '../simulation/types.ts';
 import { CinematicHud } from '../visual/CinematicHud.tsx';
+import { PremiumGameHud } from '../visual/PremiumGameHud.tsx';
 import { PixiBattlefieldRuntime } from '../visual/PixiBattlefieldRuntime.ts';
 
 function buildProofState(): SimulationState {
@@ -107,8 +108,28 @@ export function VisualProofScreen() {
   return (
     <div className="fixed inset-0 overflow-hidden bg-[#07110f] text-[#d8e4e8]">
       <canvas ref={canvasRef} className="absolute inset-0" />
+      <PremiumGameHud
+        state={state}
+        localPlayerId="blue-1"
+        localTeam={0}
+        mode="skirmish3v3"
+        serverTickRate={30}
+        matchId="visual-proof-2.0"
+        networkMetrics={{
+          rttMs: 24.6,
+          jitterMs: 2.8,
+          snapshotIntervalMs: 100,
+          skippedSnapshotWindows: 0,
+          correctionDistance: 0.42,
+          samples: 30,
+        }}
+        pendingInputs={1}
+        networkError={null}
+        disconnectedPlayers={{}}
+        matchResult={null}
+      />
       <CinematicHud
-        matchId="visual-proof-1.3"
+        matchId="visual-proof-2.0"
         mode="skirmish3v3"
         localPlayerId="blue-1"
         localTeam={0}
@@ -118,26 +139,8 @@ export function VisualProofScreen() {
         onReturn={() => {}}
       />
 
-      <div className="absolute left-4 top-4 z-20 border-2 border-[#456675] bg-[#07131b]/92 px-4 py-3 backdrop-blur-sm">
-        <div className="font-pixel text-[9px] text-[#e8c860]">VISUAL PROOF · CINEMATIC 1.3</div>
-        <div className="mt-2 text-xs text-[#9db2ba]">
-          PixiJS · Ultra · deterministic proof scene
-        </div>
-        <div className="mt-1 text-xs text-[#7f959d]">
-          Lv {local?.level ?? 0} · {local?.gold ?? 0}g · {local?.cs ?? 0} CS
-        </div>
-      </div>
-
-      <div className="absolute right-4 top-4 z-20 border border-[#55472a] bg-[#151108]/92 px-4 py-3 text-right">
-        <div className="font-pixel text-[8px] text-[#e8c860]">OBJECTIVES</div>
-        <div className="mt-2 font-pixel text-[16px] text-[#f2df9a]">
-          {state.objectiveScore[0]} : {state.objectiveScore[1]}
-        </div>
-      </div>
-
-      <div className="absolute bottom-4 left-1/2 z-20 -translate-x-1/2 border border-[#2e4b57] bg-[#08131a]/92 px-5 py-3 text-center">
-        <div className="font-pixel text-[8px] text-[#79cfff]">Q · PRONTA</div>
-        <div className="mt-1 text-[10px] text-[#78909a]">proof harness · sem autoridade de gameplay</div>
+      <div className="pointer-events-none absolute left-1/2 top-[58px] z-20 -translate-x-1/2 rounded-full border border-[#6b5a30] bg-[#090e12]/72 px-4 py-1.5 text-[9px] uppercase tracking-[.24em] text-[#d5c179] backdrop-blur-sm">
+        Visual 2.0 · PixiJS Ultra · Production Art Pack
       </div>
     </div>
   );
