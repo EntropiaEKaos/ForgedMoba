@@ -246,9 +246,29 @@ The existing game is a feature-rich offline prototype. The migration strategy is
 - [x] branch CI + PR CI + post-merge main CI green on main @ dea5087e8e1fe09a4eee8b145e8949372b5a00f7.
 - [x] real Chromium visual proof inspected before merge; premium HUD and Visual 2.1 world atlas coexist correctly.
 
+## Visual 2.2 — current branch
+
+- [x] versioned HUD asset pack `forged-ui-v2.2.0`.
+- [x] bespoke Gareth Q and Luxana Q ability icons.
+- [x] dedicated W/E/R locked-state icon art.
+- [x] dedicated ward icon art.
+- [x] production icons for Longsword, Ruby, Boots and Pickaxe.
+- [x] inventory and shop render real item art instead of text abbreviations.
+- [x] ability dock renders real icon art instead of Unicode glyphs.
+- [x] top scoreboard reduced and made more transparent/ornamental.
+- [x] cinematic objective/event banner reduced and refined.
+- [x] minimap receives a second inset frame/material pass.
+- [x] Pixi local hero receives an animated ground sigil.
+- [x] Pixi epic objective receives rotating concentric sigils.
+- [x] Pixi towers receive subtle rotating energy arcs.
+- [x] UI assets are path/budget/viewBox validated by CI.
+- [x] Chromium visual proof fixture exercises equipped item art.
+- [ ] branch CI + PR CI + post-merge main certification.
+- [ ] inspect and archive Visual 2.2 Chromium screenshot.
+
 ## Visual milestones
-- [ ] 2.2: production skins, optimized texture export, richer ability icons/materials and expanded hero coverage.
-- [ ] 2.2: full hero roster art coverage and animation authoring workflow.
+- [ ] 2.3: production skins, optimized texture export and expanded hero coverage.
+- [ ] 2.3: full hero roster art coverage and animation authoring workflow.
 
 ## Multiplayer milestones
 - [ ] 1.0: production-ready authoritative 5v5 match architecture.
