@@ -68,6 +68,31 @@ jobs:
       - name: Production build
         run: npm run build
 
+      - name: Install Chromium for visual proof
+        if: startsWith(github.ref, 'refs/heads/visual/') || startsWith(github.head_ref, 'visual/')
+        run: npx --yes playwright@1.55.0 install --with-deps chromium
+
+      - name: Capture cinematic visual proof
+        if: startsWith(github.ref, 'refs/heads/visual/') || startsWith(github.head_ref, 'visual/')
+        run: |
+          npm run preview -- --host 127.0.0.1 --port 4173 > /tmp/forged-preview.log 2>&1 &
+          PREVIEW_PID=$!
+          trap "kill $PREVIEW_PID || true" EXIT
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:4173/ >/dev/null; then break; fi
+            sleep 1
+          done
+          npx --yes playwright@1.55.0 screenshot             --browser chromium             --viewport-size "1440,900"             --wait-for-timeout 3300             "http://127.0.0.1:4173/?visual-proof=cinematic"             visual-proof-cinematic.png
+
+      - name: Upload cinematic visual proof
+        if: startsWith(github.ref, 'refs/heads/visual/') || startsWith(github.head_ref, 'visual/')
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-proof-cinematic
+          path: visual-proof-cinematic.png
+          if-no-files-found: error
+          retention-days: 7
+
   server-quality:
     name: Server typecheck + authoritative runner
     runs-on: ubuntu-latest

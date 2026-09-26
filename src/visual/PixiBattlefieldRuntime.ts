@@ -14,6 +14,16 @@ import {
 } from './quality.ts';
 import { CombatFxRuntime } from './CombatFxRuntime.ts';
 import { EnvironmentRuntime } from './EnvironmentRuntime.ts';
+import {
+  cameraCueForEvent,
+  CinematicObserver,
+  type CinematicCameraCue,
+} from './cinematicModel.ts';
+
+interface ActiveCameraCue extends CinematicCameraCue {
+  startedAt: number;
+  until: number;
+}
 
 interface EntityNode {
   root: Container;
@@ -83,6 +93,7 @@ export class PixiBattlefieldRuntime {
   private readonly entities = new Container();
   private readonly environment = new EnvironmentRuntime();
   private readonly combatFx = new CombatFxRuntime();
+  private readonly cinematic = new CinematicObserver();
   private readonly nodes = new Map<number, EntityNode>();
   private initialized = false;
   private destroyed = false;
@@ -96,6 +107,8 @@ export class PixiBattlefieldRuntime {
   private cameraZoom = 0.72;
   private terrainKey = '';
   private lastFrameAt = 0;
+  private introStartedAt = 0;
+  private activeCameraCue: ActiveCameraCue | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -155,26 +168,70 @@ export class PixiBattlefieldRuntime {
     this.ensureTerrain();
 
     const now = performance.now();
+    if (this.introStartedAt === 0) this.introStartedAt = now;
     const deltaMs = this.lastFrameAt > 0 ? now - this.lastFrameAt : 16.67;
     this.lastFrameAt = now;
     this.environment.update(deltaMs, input.state, input.localPlayerId, input.quality);
     this.combatFx.observe(input.state, input.quality);
     this.combatFx.update(deltaMs, input.quality);
 
+    for (const event of this.cinematic.observe(input.state)) {
+      const cue = cameraCueForEvent(event, input.localPlayerId);
+      if (!cue) continue;
+      if (
+        !this.activeCameraCue ||
+        now >= this.activeCameraCue.until ||
+        cue.priority >= this.activeCameraCue.priority
+      ) {
+        this.activeCameraCue = {
+          ...cue,
+          startedAt: now,
+          until: now + cue.durationMs,
+        };
+      }
+    }
+
     const local = Object.values(input.state.entities)
       .filter((entity) => entity.ownerPlayerId === input.localPlayerId)
       .sort((a, b) => a.id - b.id)[0] ?? null;
-
-    if (local && !local.dead) {
-      this.cameraX += (local.x - this.cameraX) * 0.14;
-      this.cameraY += (local.y - this.cameraY) * 0.14;
-    }
 
     const minZoom = Math.max(
       0.45,
       Math.min(0.82, Math.min(this.screenWidth / 1500, this.screenHeight / 950)),
     );
-    this.cameraZoom += (minZoom - this.cameraZoom) * 0.08;
+
+    let targetX = local && !local.dead ? local.x : this.cameraX;
+    let targetY = local && !local.dead ? local.y : this.cameraY;
+    let targetZoom = minZoom;
+
+    const introProgress = Math.max(0, Math.min(1, (now - this.introStartedAt) / 1800));
+    if (local && introProgress < 1) {
+      const eased = 1 - Math.pow(1 - introProgress, 3);
+      targetX = input.state.width / 2 + (local.x - input.state.width / 2) * eased;
+      targetY = input.state.height / 2 + (local.y - input.state.height / 2) * eased;
+      targetZoom = minZoom * (0.76 + eased * 0.24);
+    }
+
+    if (this.activeCameraCue && now < this.activeCameraCue.until) {
+      const span = Math.max(1, this.activeCameraCue.until - this.activeCameraCue.startedAt);
+      const progress = Math.max(0, Math.min(1, (now - this.activeCameraCue.startedAt) / span));
+      const cinematicPulse = Math.sin(progress * Math.PI);
+      const qualityWeight =
+        input.quality === 'low' ? 0.24 :
+        input.quality === 'medium' ? 0.46 :
+        input.quality === 'ultra' ? 0.88 :
+        0.72;
+      const weight = cinematicPulse * qualityWeight;
+      targetX += (this.activeCameraCue.x - targetX) * weight;
+      targetY += (this.activeCameraCue.y - targetY) * weight;
+      targetZoom += this.activeCameraCue.zoomBoost * weight;
+    } else if (this.activeCameraCue) {
+      this.activeCameraCue = null;
+    }
+
+    this.cameraX += (targetX - this.cameraX) * 0.14;
+    this.cameraY += (targetY - this.cameraY) * 0.14;
+    this.cameraZoom += (targetZoom - this.cameraZoom) * 0.08;
     this.clampCamera();
 
     this.world.pivot.set(this.cameraX, this.cameraY);
