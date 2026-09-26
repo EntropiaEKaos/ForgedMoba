@@ -22,6 +22,8 @@ import {
 } from './cinematicModel.ts';
 import { ArtAssetRegistry } from './art/ArtAssetRegistry.ts';
 import type { HeroArtAnimation, WorldArtKey } from './art/types.ts';
+import { materialForHero } from './capabilityRegistry.ts';
+import { resolveSkinVisual, type SkinVisualSelection } from './skinVisualContract.ts';
 
 interface ActiveCameraCue extends CinematicCameraCue {
   startedAt: number;
@@ -51,6 +53,7 @@ export interface BattlefieldRenderInput {
   interpolated: InterpolatedFrame | null;
   localPlayerId?: string;
   quality: VisualQuality;
+  skinVisuals?: Record<string, SkinVisualSelection>;
 }
 
 const ENTITY_COLORS = {
@@ -95,7 +98,7 @@ function entityLabel(entity: SimEntity): string {
   return '';
 }
 
-function signature(entity: SimEntity, isLocal: boolean): string {
+function signature(entity: SimEntity, isLocal: boolean, skinId = ''): string {
   return [
     entity.kind,
     entity.team,
@@ -103,6 +106,7 @@ function signature(entity: SimEntity, isLocal: boolean): string {
     entity.heroId ?? '',
     entity.campId ?? '',
     isLocal ? 'local' : 'remote',
+    skinId,
   ].join(':');
 }
 
@@ -285,7 +289,8 @@ export class PixiBattlefieldRuntime {
       const y = interpolation?.y ?? entity.y;
       const hp = interpolation?.hp ?? entity.hp;
       const maxHp = interpolation?.maxHp ?? entity.maxHp;
-      this.updateEntity(entity, x, y, hp, maxHp, isLocal, now);
+      const skin = entity.ownerPlayerId ? input.skinVisuals?.[entity.ownerPlayerId] : undefined;
+      this.updateEntity(entity, x, y, hp, maxHp, isLocal, now, skin);
     }
 
     for (const [id, node] of this.nodes) {
@@ -373,7 +378,7 @@ export class PixiBattlefieldRuntime {
       .fill({ color: 0x113342, alpha: 0.72 });
   }
 
-  private createNode(entity: SimEntity, isLocal: boolean): EntityNode {
+  private createNode(entity: SimEntity, isLocal: boolean, skin?: SkinVisualSelection): EntityNode {
     const root = new Container();
     const aura = new Graphics();
     aura.blendMode = 'add';
@@ -416,14 +421,14 @@ export class PixiBattlefieldRuntime {
       lastQCooldown: entity.abilityCooldowns.Q,
     };
     this.nodes.set(entity.id, node);
-    this.rebuildNode(node, entity, isLocal);
+    this.rebuildNode(node, entity, isLocal, skin);
     return node;
   }
 
-  private rebuildNode(node: EntityNode, entity: SimEntity, isLocal: boolean): void {
+  private rebuildNode(node: EntityNode, entity: SimEntity, isLocal: boolean, skin?: SkinVisualSelection): void {
     const color = displayColor(entity, isLocal);
     const radius = Math.max(7, entity.radius * 1.2);
-    node.signature = signature(entity, isLocal);
+    node.signature = signature(entity, isLocal, skin?.skinId ?? '');
 
     const heroArt = entity.kind === 'hero'
       ? this.artAssets.heroDefinition(entity.heroId)
@@ -434,8 +439,10 @@ export class PixiBattlefieldRuntime {
 
     node.aura.clear();
     node.sigil.clear();
+    const heroMaterial = entity.kind === 'hero' ? materialForHero(entity.heroId) : null;
+    const skinVisual = heroMaterial ? resolveSkinVisual(heroMaterial, skin) : null;
     if (entity.kind === 'hero') {
-      const auraColor = isLocal ? 0xffdf72 : entity.team === 0 ? 0x4cbcff : 0xff6262;
+      const auraColor = skinVisual?.aura ?? (isLocal ? 0xffdf72 : entity.team === 0 ? 0x4cbcff : 0xff6262);
       node.aura
         .circle(0, 3, radius * (isLocal ? 2.65 : 2.15))
         .fill({ color: auraColor, alpha: isLocal ? 0.12 : 0.065 })
@@ -502,11 +509,13 @@ export class PixiBattlefieldRuntime {
       node.art.scale.set(heroArt.scale);
       const texture = this.artAssets.heroTexture(entity.heroId, 'idle', 0);
       if (texture) node.art.texture = texture;
+      node.art.tint = skinVisual?.primary ?? 0xffffff;
     } else if (worldArt) {
       node.art.anchor.set(worldArt.anchor.x, worldArt.anchor.y);
       node.art.scale.set(worldArt.scale);
       const texture = this.artAssets.worldTexture(worldKey);
       if (texture) node.art.texture = texture;
+      node.art.tint = 0xffffff;
     }
 
     node.body.clear();
@@ -587,9 +596,10 @@ export class PixiBattlefieldRuntime {
     maxHp: number,
     isLocal: boolean,
     now: number,
+    skin?: SkinVisualSelection,
   ): void {
-    const node = this.nodes.get(entity.id) ?? this.createNode(entity, isLocal);
-    if (node.signature !== signature(entity, isLocal)) this.rebuildNode(node, entity, isLocal);
+    const node = this.nodes.get(entity.id) ?? this.createNode(entity, isLocal, skin);
+    if (node.signature !== signature(entity, isLocal, skin?.skinId ?? '')) this.rebuildNode(node, entity, isLocal, skin);
     node.root.position.set(x, y);
 
     const flashing = this.combatFx.isFlashing(entity.id);
