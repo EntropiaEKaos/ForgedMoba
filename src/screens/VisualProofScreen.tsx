@@ -103,8 +103,6 @@ export function VisualProofScreen() {
     return () => clearTimeout(timer);
   }, [initialState]);
 
-  const local = state.entities['1'];
-
   return (
     <div className="fixed inset-0 overflow-hidden bg-[#07110f] text-[#d8e4e8]">
       <canvas ref={canvasRef} className="absolute inset-0" />
