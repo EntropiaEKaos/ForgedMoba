@@ -11,8 +11,6 @@ import { PixiBattlefieldRuntime } from '../visual/PixiBattlefieldRuntime.ts';
 import { loadLegacyVisualCatalog, type LegacyVisualCatalog } from '../visual/legacyVisualCatalog.ts';
 
 const authority = CURRENT_AUTHORITATIVE_CONTENT.payload;
-const abilitySlots = ['Q', 'W', 'E', 'R'] as const;
-
 function proofHero(preferred: string, fallbackIndex: number): string {
   return authority.heroes.some((hero) => hero.id === preferred)
     ? preferred
