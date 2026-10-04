@@ -266,9 +266,41 @@ The existing game is a feature-rich offline prototype. The migration strategy is
 - [x] branch CI + PR CI + post-merge main CI green on main @ cce084c538b3c7931a6187f4915ffaf0722fb042.
 - [x] Visual 2.2 Chromium proof inspected and archived before merge.
 
+## Visual 3.1 — current branch
+
+Visual 3.1 reconciles the pre-3.0 Full Game Visual Integration work on top of the certified ForgedMoba 3.0 full-authority catalog.
+
+- [x] based on ForgedMoba 3.0 main `8a1d155369dc8abe2d5e3d62372e13aab61c44da`.
+- [x] preserves full authoritative hero/item catalog migration from PR #22.
+- [x] preserves authoritative Q/W/E/R input and `AuthoritativeVisualTag` semantics.
+- [x] Visual Event Bus converts authoritative state deltas into reusable presentation events.
+- [x] event coverage includes damage, healing, shield gain, basic attacks, Q/W/E/R casts, status impact, level-up, item equip, ward spawn, death and objectives.
+- [x] status presentation covers slow, root, stun, silence, haste and damage-reduction.
+- [x] authoritative ability visual tags map to semantic GPU material families.
+- [x] Pixi ParticleContainer remains the high-volume GPU particle path.
+- [x] MeshSimple beam/ribbon/pillar layer is active.
+- [x] `pixi-filters@6.1.5` provides Glow and AdvancedBloom passes.
+- [x] custom Pixi v8 GlProgram energy-pulse shader is active on mesh FX.
+- [x] quality presets gate expensive filters.
+- [x] environment receives reactive filtered tower/local-hero/objective lighting.
+- [x] skin visual bridge applies aura/tint/trail/particle/glow identity without changing gameplay.
+- [x] skin bridge works with both production sprites and full-catalog procedural hero fallback.
+- [x] React battlefield keeps full-authority Q/W/E/R controls while exposing skin visuals.
+- [x] skeletal animation driver contract remains ready for sprite-sheet and optional licensed Spine adapter.
+- [x] legacy visual metadata remains versioned and boundary-guarded instead of importing `src/game/` into the renderer.
+- [x] CI validates visual boundaries, catalog assets, TypeScript, determinism, network, visual suite, build, server runner and 5v5 load.
+- [x] implementation proof CI #380 green on `a634684713e16bb3bbee66eabe4d4ea12c702a83`.
+- [x] Chromium proof inspected with full-authority HUD, Anya skin identity, live Luxana shield/root, Anya defense/damage, objective and ward presentation.
+- [ ] final documentation HEAD CI green.
+- [ ] PR merge-ref CI green.
+- [ ] protected merge and post-merge main CI green.
+
 ## Visual milestones
-- [ ] 2.3: production skins, optimized texture export and expanded hero coverage.
-- [ ] 2.3: full hero roster art coverage and animation authoring workflow.
+- [ ] 3.2: production skin texture variants and optimized GPU texture export.
+- [ ] 3.2: broader hand-authored production hero art coverage over the full authoritative roster.
+- [ ] 3.2: richer directional ability geometry, persistent trails and per-ability VFX recipes.
+- [ ] 3.2: optional licensed Spine adapter only if a Spine authoring pipeline is adopted.
+
 
 ## Multiplayer milestones
 - [ ] 1.0: production-ready authoritative 5v5 match architecture.
