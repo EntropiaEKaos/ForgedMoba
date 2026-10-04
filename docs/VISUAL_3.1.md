@@ -229,3 +229,24 @@ Final release certification still requires:
 2. PR merge-ref CI green;
 3. protected squash merge with expected HEAD SHA;
 4. fresh post-merge CI on the resulting main SHA.
+
+
+## Certified release
+
+Visual 3.1 was merged through PR #23 and is certified on:
+
+`main @ 3a1c3c59c115c8d8a4083ee7d5061364f791be3f`
+
+Certification sequence:
+
+- final branch/documentation HEAD `48af4cf946c557a9d23516e7bfe6093d5e5fde99`: CI #382 green;
+- real Chromium proof generated from that exact HEAD and visually inspected;
+- PR #23 merge-ref: CI #383 green;
+- protected squash merge used the exact expected branch HEAD;
+- post-merge main: CI #384 green;
+- server TypeScript, authoritative runner and 5v5 load gate green post-merge;
+- client architecture, visual boundaries, asset validation, TypeScript, determinism, network, visual suite and production build green post-merge.
+
+The archived Chromium proof is the release visual evidence for Visual 3.1.
+
+Visual 3.2 is now the next visual milestone.
