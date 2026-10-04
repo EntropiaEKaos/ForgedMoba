@@ -17,6 +17,6 @@ test('visual event bus publishes authoritative state-delta events', () => {
   bus.observe(state);
   stepSimulation(state, [{ type: 'cast', playerId: 'a', seq: 1, tick: 0, slot: 'Q', targetId: 2 }]);
   bus.observe(state);
-  assert.ok(received.includes('q-cast'));
+  assert.ok(received.includes('ability-cast'));
   assert.ok(received.includes('status-impact'));
 });
