@@ -4,7 +4,6 @@ import type { SimulationState } from '../simulation/types.ts';
 import {
   authoritativeAbility,
   CURRENT_AUTHORITATIVE_CONTENT,
-  type AuthoritativeAbilityContent,
 } from '../shared/authoritativeContent.ts';
 import { CinematicHud } from '../visual/CinematicHud.tsx';
 import { PremiumGameHud } from '../visual/PremiumGameHud.tsx';
@@ -13,29 +12,6 @@ import { loadLegacyVisualCatalog, type LegacyVisualCatalog } from '../visual/leg
 
 const authority = CURRENT_AUTHORITATIVE_CONTENT.payload;
 const abilitySlots = ['Q', 'W', 'E', 'R'] as const;
-
-function heroWithAbility(predicate: (ability: AuthoritativeAbilityContent) => boolean): { heroId: string; slot: 'Q' | 'W' | 'E' | 'R' } | null {
-  for (const hero of authority.heroes) {
-    for (const slot of abilitySlots) {
-      if (predicate(hero.abilities[slot])) return { heroId: hero.id, slot };
-    }
-  }
-  return null;
-}
-
-const SUPPORT_PICK = heroWithAbility((ability) =>
-  ability.healBase > 0 ||
-  ability.shieldBase > 0 ||
-  ability.hastePermille > 0 ||
-  ability.damageReductionPermille > 0,
-);
-
-const CONTROL_PICK = heroWithAbility((ability) =>
-  ability.statusKind === 'root' ||
-  ability.statusKind === 'stun' ||
-  ability.statusKind === 'silence' ||
-  ability.statusKind === 'slow',
-);
 
 function proofHero(preferred: string, fallbackIndex: number): string {
   return authority.heroes.some((hero) => hero.id === preferred)
