@@ -78,14 +78,29 @@ export function materialForAbilityKey(key: string | null | undefined, heroId?: s
   return materialForHero(heroId);
 }
 
+const VISUAL_TAG_MATERIAL = {
+  blade: 'steel',
+  fire: 'fire',
+  frost: 'frost',
+  arcane: 'arcane',
+  nature: 'nature',
+  shadow: 'shadow',
+  light: 'radiant',
+  tech: 'storm',
+} as const satisfies Record<string, VisualMaterialId>;
+
 export function profileForEvent(event: CombatFxEvent): VisualEffectProfile {
-  if (event.type === 'q-cast' || event.type === 'ability-cast') return materialForHero(event.heroId);
+  if (event.type === 'ability-cast') return VISUAL_MATERIALS[VISUAL_TAG_MATERIAL[event.visualTag]];
   if (event.type === 'status-impact') {
-    if (event.status === 'root') return VISUAL_MATERIALS.arcane;
+    if (event.status === 'root') return VISUAL_MATERIALS.nature;
     if (event.status === 'stun') return VISUAL_MATERIALS.storm;
+    if (event.status === 'silence') return VISUAL_MATERIALS.shadow;
+    if (event.status === 'haste') return VISUAL_MATERIALS.radiant;
+    if (event.status === 'damage-reduction') return VISUAL_MATERIALS.steel;
     return VISUAL_MATERIALS.frost;
   }
   if (event.type === 'heal') return VISUAL_MATERIALS.nature;
+  if (event.type === 'shield-gain') return VISUAL_MATERIALS.radiant;
   if (event.type === 'level-up') return VISUAL_MATERIALS.radiant;
   if (event.type === 'ward-spawn') return VISUAL_MATERIALS.radiant;
   if (event.type === 'item-equip') return VISUAL_MATERIALS.steel;
