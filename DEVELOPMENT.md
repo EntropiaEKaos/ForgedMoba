@@ -266,7 +266,7 @@ The existing game is a feature-rich offline prototype. The migration strategy is
 - [x] branch CI + PR CI + post-merge main CI green on main @ cce084c538b3c7931a6187f4915ffaf0722fb042.
 - [x] Visual 2.2 Chromium proof inspected and archived before merge.
 
-## Visual 3.1 — current branch
+## Visual 3.1 — certified and merged
 
 Visual 3.1 reconciles the pre-3.0 Full Game Visual Integration work on top of the certified ForgedMoba 3.0 full-authority catalog.
 
@@ -291,9 +291,9 @@ Visual 3.1 reconciles the pre-3.0 Full Game Visual Integration work on top of th
 - [x] CI validates visual boundaries, catalog assets, TypeScript, determinism, network, visual suite, build, server runner and 5v5 load.
 - [x] implementation proof CI #380 green on `a634684713e16bb3bbee66eabe4d4ea12c702a83`.
 - [x] Chromium proof inspected with full-authority HUD, Anya skin identity, live Luxana shield/root, Anya defense/damage, objective and ward presentation.
-- [ ] final documentation HEAD CI green.
-- [ ] PR merge-ref CI green.
-- [ ] protected merge and post-merge main CI green.
+- [x] final branch/documentation HEAD CI #382 green on `48af4cf946c557a9d23516e7bfe6093d5e5fde99`.
+- [x] PR #23 merge-ref CI #383 green.
+- [x] protected squash merge completed; post-merge CI #384 green on `main@3a1c3c59c115c8d8a4083ee7d5061364f791be3f`.
 
 ## Visual milestones
 - [ ] 3.2: production skin texture variants and optimized GPU texture export.
