@@ -79,8 +79,8 @@ function castProofAbility(
 }
 
 function buildProofState(): SimulationState {
-  const supportHero = SUPPORT_PICK?.heroId ?? proofHero('luxana', 1);
-  const controlHero = CONTROL_PICK?.heroId ?? proofHero('blitz', 2);
+  const supportHero = proofHero('luxana', 1);
+  const controlHero = proofHero('luxana', 2);
   const state = createSimulation({
     seed: 0x1A3C1A,
     width: 3000,
@@ -89,9 +89,9 @@ function buildProofState(): SimulationState {
     withJungle: true,
     players: [
       { playerId: 'blue-1', team: 0, x: 920, y: 1120, heroId: proofHero('anya', 0) },
-      { playerId: 'blue-2', team: 0, x: 860, y: 1040, heroId: supportHero },
-      { playerId: 'blue-3', team: 0, x: 860, y: 1200, heroId: controlHero },
-      { playerId: 'red-1', team: 1, x: 1080, y: 1120, heroId: proofHero('luxana', 3) },
+      { playerId: 'blue-2', team: 0, x: 820, y: 1040, heroId: supportHero },
+      { playerId: 'blue-3', team: 0, x: 760, y: 1200, heroId: controlHero },
+      { playerId: 'red-1', team: 1, x: 980, y: 1200, heroId: proofHero('luxana', 3) },
       { playerId: 'red-2', team: 1, x: 1160, y: 1040, heroId: proofHero('rizar', 4) },
       { playerId: 'red-3', team: 1, x: 1160, y: 1200, heroId: proofHero('blitz', 5) },
     ],
@@ -214,10 +214,18 @@ export function VisualProofScreen() {
     const supportTimer = setTimeout(() => {
       setState((current) => {
         const next = structuredClone(current);
-        if (SUPPORT_PICK) castProofAbility(next, 'blue-2', 1, SUPPORT_PICK.slot, 'red-1');
+        castProofAbility(next, 'blue-2', 1, 'W', 'red-1');
         return next;
       });
     }, 2700);
+
+    const localShieldTimer = setTimeout(() => {
+      setState((current) => {
+        const next = structuredClone(current);
+        castProofAbility(next, 'blue-1', 2, 'E', 'red-1');
+        return next;
+      });
+    }, 2810);
 
     const wardTimer = setTimeout(() => {
       setState((current) => {
@@ -232,7 +240,7 @@ export function VisualProofScreen() {
     const controlTimer = setTimeout(() => {
       setState((current) => {
         const next = structuredClone(current);
-        if (CONTROL_PICK) castProofAbility(next, 'blue-3', 1, CONTROL_PICK.slot, 'red-1');
+        castProofAbility(next, 'blue-3', 1, 'Q', 'red-1');
         return next;
       });
     }, 2990);
@@ -240,7 +248,7 @@ export function VisualProofScreen() {
     const localCastTimer = setTimeout(() => {
       setState((current) => {
         const next = structuredClone(current);
-        castProofAbility(next, 'blue-1', 2, 'Q', 'red-1');
+        castProofAbility(next, 'blue-1', 3, 'Q', 'red-1');
         return next;
       });
     }, 3100);
@@ -249,6 +257,7 @@ export function VisualProofScreen() {
       clearTimeout(objectiveTimer);
       clearTimeout(progressionTimer);
       clearTimeout(supportTimer);
+      clearTimeout(localShieldTimer);
       clearTimeout(wardTimer);
       clearTimeout(controlTimer);
       clearTimeout(localCastTimer);
