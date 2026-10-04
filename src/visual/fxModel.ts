@@ -3,8 +3,14 @@ import { authoritativeAbility, type AuthoritativeVisualTag } from '../shared/aut
 
 export type CombatFxEvent =
   | { type: 'damage'; tick: number; entityId: number; x: number; y: number; amount: number }
+  | { type: 'heal'; tick: number; entityId: number; x: number; y: number; amount: number }
+  | { type: 'shield-gain'; tick: number; entityId: number; x: number; y: number; amount: number }
   | { type: 'death'; tick: number; entityId: number; x: number; y: number; kind: SimEntity['kind'] }
-  | { type: 'ability-cast'; tick: number; entityId: number; x: number; y: number; heroId: SimEntity['heroId']; slot: 'Q' | 'W' | 'E' | 'R'; visualTag: AuthoritativeVisualTag }
+  | { type: 'basic-attack'; tick: number; entityId: number; targetId: number; sourceX: number; sourceY: number; x: number; y: number; heroId: SimEntity['heroId'] }
+  | { type: 'ability-cast'; tick: number; entityId: number; x: number; y: number; heroId: string; slot: 'Q' | 'W' | 'E' | 'R'; visualTag: AuthoritativeVisualTag }
+  | { type: 'level-up'; tick: number; entityId: number; x: number; y: number; level: number }
+  | { type: 'item-equip'; tick: number; entityId: number; x: number; y: number; itemId: string }
+  | { type: 'ward-spawn'; tick: number; entityId: number; x: number; y: number; team: 0 | 1 }
   | {
       type: 'status-impact';
       tick: number;
@@ -14,18 +20,24 @@ export type CombatFxEvent =
       sourceY: number;
       x: number;
       y: number;
-      status: 'slow' | 'root' | 'stun' | 'silence';
+      status: 'slow' | 'root' | 'stun' | 'silence' | 'haste' | 'damage-reduction';
     }
   | { type: 'objective'; tick: number; team: 0 | 1; x: number; y: number };
 
 export interface VisualEntityProbe {
   hp: number;
+  shieldHp: number;
   dead: boolean;
   x: number;
   y: number;
   kind: SimEntity['kind'];
+  team: 0 | 1;
   heroId: SimEntity['heroId'];
   abilityCooldowns: SimEntity['abilityCooldowns'];
+  attackCooldown: number;
+  attackTargetId: number | null;
+  level: number;
+  inventory: string[];
   statuses: { kind: string; sourceId: number }[];
 }
 
@@ -40,12 +52,18 @@ export function captureVisualProbe(state: SimulationState): VisualStateProbe {
   for (const entity of Object.values(state.entities)) {
     entities[entity.id] = {
       hp: entity.hp,
+      shieldHp: entity.shieldHp,
       dead: entity.dead,
       x: entity.x,
       y: entity.y,
       kind: entity.kind,
+      team: entity.team,
       heroId: entity.heroId,
       abilityCooldowns: { ...entity.abilityCooldowns },
+      attackCooldown: entity.attackCooldownRemaining,
+      attackTargetId: entity.attackTargetId,
+      level: entity.level,
+      inventory: [...entity.inventory],
       statuses: entity.statuses
         .map((status) => ({ kind: status.kind, sourceId: status.sourceId }))
         .sort((a, b) => a.kind.localeCompare(b.kind) || a.sourceId - b.sourceId),
@@ -69,7 +87,20 @@ export function deriveCombatFx(
   for (const id of ids) {
     const now = current.entities[id];
     const before = previous.entities[id];
-    if (!before) continue;
+
+    if (!before) {
+      if (now.kind === 'ward') {
+        events.push({
+          type: 'ward-spawn',
+          tick: current.tick,
+          entityId: id,
+          x: now.x,
+          y: now.y,
+          team: now.team,
+        });
+      }
+      continue;
+    }
 
     if (now.hp < before.hp) {
       events.push({
@@ -79,6 +110,28 @@ export function deriveCombatFx(
         x: now.x,
         y: now.y,
         amount: Math.max(0, before.hp - now.hp),
+      });
+    }
+
+    if (now.hp > before.hp && !now.dead) {
+      events.push({
+        type: 'heal',
+        tick: current.tick,
+        entityId: id,
+        x: now.x,
+        y: now.y,
+        amount: Math.max(0, now.hp - before.hp),
+      });
+    }
+
+    if (now.shieldHp > before.shieldHp && !now.dead) {
+      events.push({
+        type: 'shield-gain',
+        tick: current.tick,
+        entityId: id,
+        x: now.x,
+        y: now.y,
+        amount: Math.max(0, now.shieldHp - before.shieldHp),
       });
     }
 
@@ -107,12 +160,65 @@ export function deriveCombatFx(
           visualTag: authoritativeAbility(now.heroId, slot).visualTag,
         });
       }
+
+      if (now.attackCooldown > before.attackCooldown + 1 && now.attackTargetId !== null) {
+        const target = current.entities[now.attackTargetId];
+        if (target) {
+          events.push({
+            type: 'basic-attack',
+            tick: current.tick,
+            entityId: id,
+            targetId: now.attackTargetId,
+            sourceX: now.x,
+            sourceY: now.y,
+            x: target.x,
+            y: target.y,
+            heroId: now.heroId,
+          });
+        }
+      }
+
+      if (now.level > before.level) {
+        events.push({
+          type: 'level-up',
+          tick: current.tick,
+          entityId: id,
+          x: now.x,
+          y: now.y,
+          level: now.level,
+        });
+      }
+
+      const beforeCounts = new Map<string, number>();
+      for (const item of before.inventory) beforeCounts.set(item, (beforeCounts.get(item) ?? 0) + 1);
+      for (const itemId of now.inventory) {
+        const count = beforeCounts.get(itemId) ?? 0;
+        if (count > 0) {
+          beforeCounts.set(itemId, count - 1);
+          continue;
+        }
+        events.push({
+          type: 'item-equip',
+          tick: current.tick,
+          entityId: id,
+          x: now.x,
+          y: now.y,
+          itemId,
+        });
+      }
     }
 
     const beforeStatuses = new Set(before.statuses.map((status) => status.kind + ':' + status.sourceId));
     for (const status of now.statuses) {
       if (beforeStatuses.has(status.kind + ':' + status.sourceId)) continue;
-      if (status.kind === 'slow' || status.kind === 'root' || status.kind === 'stun' || status.kind === 'silence') {
+      if (
+        status.kind === 'slow' ||
+        status.kind === 'root' ||
+        status.kind === 'stun' ||
+        status.kind === 'silence' ||
+        status.kind === 'haste' ||
+        status.kind === 'damage-reduction'
+      ) {
         const source = current.entities[status.sourceId];
         events.push({
           type: 'status-impact',
