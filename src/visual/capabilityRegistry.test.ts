@@ -17,12 +17,14 @@ test('legacy ability keys can resolve semantic material families', () => {
 
 test('authoritative visual events resolve without importing the legacy engine', () => {
   const profile = profileForEvent({
-    type: 'q-cast',
+    type: 'ability-cast',
     tick: 10,
     entityId: 1,
     x: 50,
     y: 60,
     heroId: 'luxana',
+    slot: 'Q',
+    visualTag: 'light',
   });
   assert.equal(profile.id, 'radiant');
 });
