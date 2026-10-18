@@ -266,7 +266,7 @@ The existing game is a feature-rich offline prototype. The migration strategy is
 - [x] branch CI + PR CI + post-merge main CI green on main @ cce084c538b3c7931a6187f4915ffaf0722fb042.
 - [x] Visual 2.2 Chromium proof inspected and archived before merge.
 
-## Visual 3.1 — current branch
+## Visual 3.1 — certified and merged
 
 Visual 3.1 reconciles the pre-3.0 Full Game Visual Integration work on top of the certified ForgedMoba 3.0 full-authority catalog.
 
@@ -291,9 +291,35 @@ Visual 3.1 reconciles the pre-3.0 Full Game Visual Integration work on top of th
 - [x] CI validates visual boundaries, catalog assets, TypeScript, determinism, network, visual suite, build, server runner and 5v5 load.
 - [x] implementation proof CI #380 green on `a634684713e16bb3bbee66eabe4d4ea12c702a83`.
 - [x] Chromium proof inspected with full-authority HUD, Anya skin identity, live Luxana shield/root, Anya defense/damage, objective and ward presentation.
+- [x] final documentation HEAD CI green.
+- [x] PR merge-ref CI green.
+- [x] protected merge and post-merge main CI green on main @ `3a1c3c59c115c8d8a4083ee7d5061364f791be3f`.
+
+## Production Backend 4.0 — current branch
+
+- [x] persistence interface separated from Express/Socket.IO/MatchRunner.
+- [x] memory adapter retained for deterministic backend tests.
+- [x] atomic JSON-file persistence adapter for durable single-node deployments.
+- [x] persistent accounts and password hashes.
+- [x] server-side revocable sessions bound to JWT `sid`.
+- [x] production refuses volatile memory persistence.
+- [x] production file mode requires explicit `FORGED_DATA_FILE`.
+- [x] completed-match history persisted idempotently by match ID.
+- [x] ranked 5v5 MMR + ranked W/L progression.
+- [x] authenticated online profile and history endpoints.
+- [x] public 5v5 leaderboard endpoint.
+- [x] client validates persisted session before reconnecting Socket.IO.
+- [x] logout performs server-side session revocation.
+- [x] online profile refreshes after authoritative match completion.
+- [x] multiplayer lobby exposes MMR and backend durability status.
+- [x] persistence unit suite includes restart survival and MMR idempotency.
+- [x] implementation branch CI #398 green on `91e2abac523b487e80b7c64a560e0208d4b53753`.
+- [x] release-candidate CI #400 green on `e16990a78a60021aad33bc97effe92236caea430`.
 - [ ] final documentation HEAD CI green.
-- [ ] PR merge-ref CI green.
+- [ ] PR CI green.
 - [ ] protected merge and post-merge main CI green.
+
+Production Backend 4.0 is a durable single-node baseline. PostgreSQL/Neon and shared coordination remain the scale-out follow-up, but can now be introduced behind stable storage interfaces.
 
 ## Visual milestones
 - [ ] 3.2: production skin texture variants and optimized GPU texture export.

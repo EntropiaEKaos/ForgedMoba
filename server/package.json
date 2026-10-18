@@ -1,7 +1,7 @@
 {
   "name": "pixel-rift-server",
-  "version": "3.0.0",
-  "description": "ForgedMoba authoritative full-catalog match server",
+  "version": "4.0.0",
+  "description": "ForgedMoba authoritative server with durable progression and revocable sessions",
   "type": "module",
   "main": "src/index.ts",
   "scripts": {

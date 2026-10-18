@@ -25,6 +25,13 @@ export interface SessionUser {
   username: string;
   mode: AuthMode;
   level?: number;
+  gamesPlayed?: number;
+  wins?: number;
+  losses?: number;
+  rankedMmr?: number;
+  rankedGames?: number;
+  rankedWins?: number;
+  rankedLosses?: number;
 }
 
 const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3001';
@@ -59,6 +66,13 @@ class ConnectionManager {
     reconnectGraceMs?: number;
     rankedDraftTimeoutMs?: number;
     activeDrafts?: number;
+    persistence?: {
+      mode: string;
+      durable: boolean;
+      users: number;
+      activeSessions: number;
+      matches: number;
+    };
   } | null = null;
   inQueue = false;
   queuePos: number | null = null;
@@ -120,6 +134,13 @@ class ConnectionManager {
         reconnectGraceMs?: number;
         rankedDraftTimeoutMs?: number;
         activeDrafts?: number;
+        persistence?: {
+          mode: string;
+          durable: boolean;
+          users: number;
+          activeSessions: number;
+          matches: number;
+        };
       };
       this.serverInfo = {
         version: data.version,
@@ -131,6 +152,7 @@ class ConnectionManager {
         reconnectGraceMs: data.reconnectGraceMs,
         rankedDraftTimeoutMs: data.rankedDraftTimeoutMs,
         activeDrafts: data.activeDrafts,
+        persistence: data.persistence,
       };
       if (data.contentVersion && data.contentVersion !== LOCAL_CONTENT_VERSION) {
         this.lastNetworkError = 'content-version-mismatch';
@@ -150,7 +172,14 @@ class ConnectionManager {
     if (up) {
       this.status = 'online';
       const token = localStorage.getItem(TOKEN_KEY);
-      if (token && this.user?.mode === 'account') this.connectSocket(token);
+      if (token && this.user?.mode === 'account') {
+        const sessionValid = await this.refreshOnlineProfile(token);
+        if (sessionValid) this.connectSocket(token);
+        else {
+          localStorage.removeItem(TOKEN_KEY);
+          this.enterGuest();
+        }
+      }
     } else {
       this.status = 'offline';
       if (this.user?.mode !== 'guest') this.enterGuest();
@@ -256,6 +285,7 @@ class ConnectionManager {
     };
     this.disconnectedPlayers = {};
     this.emit();
+    void this.refreshOnlineProfile();
   };
 
   private onGameSnapshot = (snapshot: AuthoritativeSnapshot<SimulationState>) => {
@@ -488,6 +518,26 @@ class ConnectionManager {
     }
   }
 
+  async refreshOnlineProfile(tokenOverride?: string): Promise<boolean> {
+    const token = tokenOverride || localStorage.getItem(TOKEN_KEY);
+    if (!token) return false;
+    try {
+      const res = await fetch(API_URL + '/api/me/profile', {
+        headers: { Authorization: 'Bearer ' + token },
+      });
+      if (!res.ok) return false;
+      const data = await res.json() as { user?: Omit<SessionUser, 'mode'> };
+      if (!data.user?.id || !data.user.username) return false;
+      this.mode = 'account';
+      this.user = { ...data.user, mode: 'account' };
+      localStorage.setItem(USER_KEY, JSON.stringify(this.user));
+      this.emit();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   private applyAccount(token: string, user: SessionUser) {
     this.disconnectSocket();
     this.mode = 'account';
@@ -503,6 +553,13 @@ class ConnectionManager {
   }
 
   logout() {
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (token) {
+      void fetch(API_URL + '/api/auth/logout', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + token },
+      }).catch(() => undefined);
+    }
     this.disconnectSocket();
     localStorage.removeItem(TOKEN_KEY);
     this.inQueue = false;

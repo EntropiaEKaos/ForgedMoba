@@ -452,7 +452,7 @@ function SkinsModal({ profile, onClose, onUpdate }: { profile: Profile; onClose:
 
 // ================= MULTIPLAYER LOBBY =================
 function MultiplayerLobby({ onPlay }: { onPlay: () => void }) {
-  const { conn, status, queueMode, queueRequiredPlayers } = useConnection();
+  const { conn, status, user, queueMode, queueRequiredPlayers } = useConnection();
   const [tick, setTick] = useState(0);
   useEffect(() => {
     const interval = setInterval(() => setTick(value => value + 1), 500);
@@ -562,7 +562,49 @@ function MultiplayerLobby({ onPlay }: { onPlay: () => void }) {
         </div>
       )}
 
-      <div className="grid grid-cols-3 gap-3">
+      {user?.mode === 'account' ? (
+        <div className="pixel-panel bg-[#0c151d] p-4 border-[#5a4c7a]">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <div className="font-pixel text-[9px] text-[#c7a7ff] mb-1">RANKED PROFILE · ONLINE</div>
+              <div className="text-[13px] text-[#7f929d]">
+                Conta persistida no backend · resultados 5v5 atualizam o rating após o encerramento autoritativo.
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-5 text-center">
+              <div>
+                <div className="font-pixel text-[7px] text-[#718692]">MMR</div>
+                <div className="font-pixel text-[16px] text-[#e8c860]">{user.rankedMmr ?? 1000}</div>
+              </div>
+              <div>
+                <div className="font-pixel text-[7px] text-[#718692]">RANQUEADAS</div>
+                <div className="font-pixel text-[13px] text-[#d9e6ea]">{user.rankedGames ?? 0}</div>
+              </div>
+              <div>
+                <div className="font-pixel text-[7px] text-[#718692]">V / D</div>
+                <div className="font-pixel text-[13px] text-[#80e0a0]">
+                  {user.rankedWins ?? 0}
+                  <span className="text-[#657781]"> / </span>
+                  <span className="text-[#ff8d8d]">{user.rankedLosses ?? 0}</span>
+                </div>
+              </div>
+              <div>
+                <div className="font-pixel text-[7px] text-[#718692]">PARTIDAS</div>
+                <div className="font-pixel text-[13px] text-[#8ac8ff]">{user.gamesPlayed ?? 0}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="pixel-panel bg-[#17120d] p-4 border-[#72552b] text-center">
+          <div className="font-pixel text-[8px] text-[#e8c860]">CONTA NECESSÁRIA PARA PROGRESSO ONLINE</div>
+          <div className="text-[13px] text-[#9b8e79] mt-1">
+            Entre em uma conta para manter sessão, histórico e MMR entre reinicializações do servidor.
+          </div>
+        </div>
+      )}
+
+      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <div className="pixel-panel bg-[#101820] p-4 text-center">
           <div className="font-pixel text-[8px] text-[#5ad0c0] mb-1">JOGADORES ONLINE</div>
           <div className="font-pixel text-[16px] text-[#80e0a0]">{conn.serverInfo?.players ?? '?'}</div>
@@ -575,6 +617,12 @@ function MultiplayerLobby({ onPlay }: { onPlay: () => void }) {
           <div className="font-pixel text-[8px] text-[#5ad0c0] mb-1">RECONNECT</div>
           <div className="font-pixel text-[10px] text-[#8ac8ff] mt-1.5">
             {Math.round((conn.serverInfo?.reconnectGraceMs ?? 30000) / 1000)}s GRACE
+          </div>
+        </div>
+        <div className="pixel-panel bg-[#101820] p-4 text-center">
+          <div className="font-pixel text-[8px] text-[#5ad0c0] mb-1">PERSISTÊNCIA</div>
+          <div className={"font-pixel text-[10px] mt-1.5 " + (conn.serverInfo?.persistence?.durable ? "text-[#80e0a0]" : "text-[#ffb070]")}>
+            {conn.serverInfo?.persistence?.durable ? 'DURÁVEL' : 'VOLÁTIL'}
           </div>
         </div>
       </div>
