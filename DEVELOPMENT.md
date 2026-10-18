@@ -295,7 +295,7 @@ Visual 3.1 reconciles the pre-3.0 Full Game Visual Integration work on top of th
 - [x] PR merge-ref CI green.
 - [x] protected merge and post-merge main CI green on main @ `3a1c3c59c115c8d8a4083ee7d5061364f791be3f`.
 
-## Production Backend 4.0 — current branch
+## Production Backend 4.0 — certified and merged
 
 - [x] persistence interface separated from Express/Socket.IO/MatchRunner.
 - [x] memory adapter retained for deterministic backend tests.
@@ -315,11 +315,12 @@ Visual 3.1 reconciles the pre-3.0 Full Game Visual Integration work on top of th
 - [x] persistence unit suite includes restart survival and MMR idempotency.
 - [x] implementation branch CI #398 green on `91e2abac523b487e80b7c64a560e0208d4b53753`.
 - [x] release-candidate CI #400 green on `e16990a78a60021aad33bc97effe92236caea430`.
-- [ ] final documentation HEAD CI green.
-- [ ] PR CI green.
-- [ ] protected merge and post-merge main CI green.
+- [x] final documentation branch CI #401 green on `fa4ea0c9faecde977b674cc079a93876b679e5d7`.
+- [x] PR #24 merge-ref CI #402 green.
+- [x] protected squash merge completed as `6501802dc3ad9364b64d2728fe877a809cdcd60c`.
+- [x] post-merge main CI #403 green on `6501802dc3ad9364b64d2728fe877a809cdcd60c`.
 
-Production Backend 4.0 is a durable single-node baseline. PostgreSQL/Neon and shared coordination remain the scale-out follow-up, but can now be introduced behind stable storage interfaces.
+Production Backend 4.0 is a certified durable single-node baseline. PostgreSQL/Neon and shared coordination remain the scale-out follow-up, but can now be introduced behind stable storage interfaces.
 
 ## Visual milestones
 - [ ] 3.2: production skin texture variants and optimized GPU texture export.
