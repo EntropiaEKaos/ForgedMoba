@@ -116,8 +116,11 @@ export interface PersistenceStore {
 }
 
 export class DuplicateIdentityError extends Error {
-  constructor(readonly field: 'username' | 'email') {
+  readonly field: 'username' | 'email';
+
+  constructor(field: 'username' | 'email') {
     super(field === 'username' ? 'Usuário já existe.' : 'E-mail já cadastrado.');
+    this.field = field;
   }
 }
 
@@ -157,10 +160,11 @@ export class MemoryPersistenceStore implements PersistenceStore {
   protected readonly usersByEmail = new Map<string, string>();
   protected readonly sessions = new Map<string, StoredSession>();
   protected readonly matches = new Map<string, StoredMatch>();
+  protected readonly now: () => number;
 
-  constructor(
-    protected readonly now: () => number = () => Date.now(),
-  ) {}
+  constructor(now: () => number = () => Date.now()) {
+    this.now = now;
+  }
 
   async initialize(): Promise<void> {}
 
@@ -375,13 +379,12 @@ export class MemoryPersistenceStore implements PersistenceStore {
 }
 
 export class JsonFilePersistenceStore extends MemoryPersistenceStore {
+  readonly filePath: string;
   private writeChain: Promise<void> = Promise.resolve();
 
-  constructor(
-    readonly filePath: string,
-    now?: () => number,
-  ) {
+  constructor(filePath: string, now?: () => number) {
     super(now);
+    this.filePath = filePath;
   }
 
   override async initialize(): Promise<void> {
