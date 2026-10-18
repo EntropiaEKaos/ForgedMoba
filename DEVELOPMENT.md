@@ -313,7 +313,8 @@ Visual 3.1 reconciles the pre-3.0 Full Game Visual Integration work on top of th
 - [x] online profile refreshes after authoritative match completion.
 - [x] multiplayer lobby exposes MMR and backend durability status.
 - [x] persistence unit suite includes restart survival and MMR idempotency.
-- [ ] final branch CI green.
+- [x] implementation branch CI #398 green on `91e2abac523b487e80b7c64a560e0208d4b53753`.
+- [ ] final release HEAD CI green.
 - [ ] PR CI green.
 - [ ] protected merge and post-merge main CI green.
 
