@@ -1,24 +1,32 @@
 # Security status
 
-ForgedMoba is currently an early development project.
+ForgedMoba now has deterministic authoritative multiplayer and a durable single-node progression backend. This document lists the current security boundary without overstating production readiness.
 
-## Important limitations
-
-- Server accounts and matches are still stored in memory and disappear on restart.
-- The browser currently stores the development JWT in localStorage.
-- The authoritative match simulation is not connected yet; the server currently validates and relays input commands only.
-- The admin/content system is local-browser tooling and must not be treated as a production authority.
-
-## Protections introduced by the multiplayer foundation
+## Current protections
 
 - Passwords are hashed with Node scrypt plus a per-user random salt.
-- Socket.IO JWTs are verified before a realtime connection is accepted.
-- Auth endpoints have a small in-memory rate limiter.
-- Production startup requires an explicit JWT_SECRET.
-- Match sockets are joined to explicit rooms.
-- Client-supplied world state is rejected.
-- JSON and Socket.IO payload sizes are bounded at a coarse transport level.
+- Production startup requires an explicit `JWT_SECRET`.
+- Login/registration create a server-side session ID (`sid`) persisted separately from the JWT.
+- HTTP authenticated routes and Socket.IO verify both JWT validity and an active non-revoked session.
+- Logout revokes the active server session.
+- Client-authored world state is rejected; clients send only gameplay intent.
+- Matchmaking uses authenticated identities, explicit rooms and content-version checks.
+- Reconnect replaces the previous controlling socket instead of allowing dual control.
+- JSON and Socket.IO payload sizes are bounded at the transport level.
+- Auth endpoints use a coarse in-process rate limiter.
+- The file persistence adapter writes state through temp-file + atomic rename and creates the state file with mode `0600`.
+- Production refuses volatile memory persistence and requires an explicit durable file path when using the file adapter.
 
-## Production prerequisites
+## Important remaining limitations
 
-Before public production deployment, add a persistent database/session model, robust rate limiting, HTTPS-only deployment, secret management, session revocation/rotation, content signing/versioning, authoritative simulation, abuse telemetry and dependency/security scanning.
+- The browser still stores the bearer JWT in `localStorage`; an XSS bug could therefore expose the token.
+- Session records are durable, but there is no refresh-token rotation/device-management flow yet.
+- File persistence is single-node. It is not safe as a shared store for horizontally scaled server replicas.
+- Matchmaking, reconnect leases, active draft rooms and active simulations remain process-local runtime state.
+- Auth rate limiting is process-local rather than distributed.
+- Structured security/audit telemetry is still limited.
+- PostgreSQL/Neon, Redis/shared coordination, migrations and automated backup/restore are not implemented yet.
+
+## Production scale-out prerequisites
+
+Before broad public deployment, add a transactional database adapter, shared matchmaking/session coordination, refresh-token rotation, centralized rate limiting, HTTPS-only deployment, secret rotation, structured audit logs/metrics/tracing, backup/restore drills, dependency scanning and an XSS-focused review of the web client.
