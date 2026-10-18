@@ -20,12 +20,19 @@ import { MatchRunner, stableSeedFromMatchId } from './matchRunner.ts';
 import { MatchmakingQueues, type MatchmakingEntry } from './matchmaking.ts';
 import { ReconnectGraceRegistry } from './reconnectGrace.ts';
 import { RankedDraftRoom } from './rankedDraft.ts';
+import {
+  createPersistenceFromEnv,
+  DuplicateIdentityError,
+  toPlayerProfile,
+  type StoredUser,
+} from './persistence.ts';
 
 const PORT = Number(process.env.PORT || 3001);
 const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:5173';
 const SERVER_VERSION = '3.0.0';
 const RECONNECT_GRACE_MS = 30_000;
 const RANKED_DRAFT_TIMEOUT_MS = 120_000;
+const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const CONTENT_VERSION = CURRENT_AUTHORITATIVE_CONTENT.contentVersion;
 if (CURRENT_AUTHORITATIVE_CONTENT.payload.rules.tickRate !== SIM_TICK_RATE) {
   throw new Error('Published content tickRate does not match simulation tickRate.');
@@ -39,14 +46,6 @@ function resolveJwtSecret(): string {
 }
 const JWT_SECRET = resolveJwtSecret();
 
-interface DbUser {
-  id: string;
-  username: string;
-  email: string;
-  passwordHash: string;
-  passwordSalt: string;
-  level: number;
-}
 interface QueueEntry extends MatchmakingEntry {}
 interface MatchPlayer extends QueueEntry {
   team: 0 | 1;
@@ -68,13 +67,12 @@ interface AuthedSocketData {
 }
 interface GameInputPayload { matchId?: unknown; command?: unknown; }
 
-const users = new Map<string, DbUser>();
-const usersByName = new Map<string, string>();
-const usersByEmail = new Map<string, string>();
 const matchmaking = new MatchmakingQueues();
 const activeMatches = new Map<string, ActiveMatch>();
 const draftRooms = new Map<string, RankedDraftRoom>();
 const reconnectGrace = new ReconnectGraceRegistry(RECONNECT_GRACE_MS);
+const persistence = createPersistenceFromEnv();
+await persistence.initialize();
 
 const app = express();
 const httpServer = createServer(app);
@@ -104,7 +102,6 @@ function authRateLimit(req: Request, res: Response, next: NextFunction): void {
   next();
 }
 
-function normalizeIdentity(value: string): string { return value.trim().toLowerCase(); }
 function isValidUsername(value: unknown): value is string {
   return typeof value === 'string' && /^[A-Za-z0-9_]{3,24}$/.test(value.trim());
 }
@@ -117,13 +114,38 @@ function isValidPassword(value: unknown): value is string {
 function hashPassword(password: string, salt = randomBytes(16).toString('hex')): { hash: string; salt: string } {
   return { hash: scryptSync(password, salt, 64).toString('hex'), salt };
 }
-function verifyPassword(password: string, user: DbUser): boolean {
+function verifyPassword(password: string, user: StoredUser): boolean {
   const actual = Buffer.from(scryptSync(password, user.passwordSalt, 64));
   const expected = Buffer.from(user.passwordHash, 'hex');
   return actual.length === expected.length && timingSafeEqual(actual, expected);
 }
-function sign(user: DbUser): string {
-  return jwt.sign({ userId: user.id, username: user.username }, JWT_SECRET, { expiresIn: '7d' });
+async function issueToken(user: StoredUser): Promise<string> {
+  const session = await persistence.createSession(user.id, SESSION_TTL_MS);
+  return jwt.sign(
+    { userId: user.id, username: user.username, sid: session.id },
+    JWT_SECRET,
+    { expiresIn: '7d' },
+  );
+}
+function accountPayload(user: StoredUser) {
+  return { ...toPlayerProfile(user), email: user.email };
+}
+async function authenticateRequest(req: Request): Promise<{ user: StoredUser; sessionId: string } | null> {
+  const header = req.headers.authorization;
+  if (typeof header !== 'string' || !header.startsWith('Bearer ')) return null;
+  try {
+    const decoded = jwt.verify(header.slice(7), JWT_SECRET) as JwtPayload & {
+      userId?: string;
+      sid?: string;
+    };
+    if (typeof decoded.userId !== 'string' || typeof decoded.sid !== 'string') return null;
+    const session = await persistence.findActiveSession(decoded.sid);
+    if (!session || session.userId !== decoded.userId) return null;
+    const user = await persistence.findUserById(decoded.userId);
+    return user ? { user, sessionId: decoded.sid } : null;
+  } catch {
+    return null;
+  }
 }
 function removeSocketFromQueue(socketId: string): void {
   matchmaking.leaveBySocket(socketId);
@@ -239,20 +261,45 @@ function createAssignedMatch(assigned: MatchPlayer[], mode: MatchMode): ActiveMa
     })),
     onSnapshot: (snapshot) => io.to(id).emit('game:snapshot', snapshot),
     onComplete: (state) => {
-      console.log('[match] concluída ' + id + ' vencedor=' + state.winner);
-      io.to(id).emit('game:complete', { matchId: id, winner: state.winner });
       const completed = activeMatches.get(id);
-      if (completed) {
-        for (const participant of completed.players) {
-          const participantSocket = io.sockets.sockets.get(participant.socketId);
-          if (participantSocket) {
-            delete socketIdentity(participantSocket).matchId;
-            participantSocket.leave(id);
+      void (async () => {
+        if (completed) {
+          try {
+            await persistence.recordCompletedMatch({
+              id,
+              mode: completed.mode,
+              contentVersion: CONTENT_VERSION,
+              createdAt: completed.createdAt,
+              completedAt: Date.now(),
+              durationTicks: state.tick,
+              winner: state.winner,
+              players: completed.players.map((player) => ({
+                userId: player.userId,
+                username: player.username,
+                team: player.team,
+                slot: player.slot,
+                heroId: player.heroId,
+              })),
+            });
+          } catch (error) {
+            console.error('[persistence] falha ao registrar match=' + id, error);
           }
         }
-      }
-      reconnectGrace.clearMatch(id);
-      activeMatches.delete(id);
+
+        console.log('[match] concluída ' + id + ' vencedor=' + state.winner);
+        io.to(id).emit('game:complete', { matchId: id, winner: state.winner });
+        if (completed) {
+          for (const participant of completed.players) {
+            const participantSocket = io.sockets.sockets.get(participant.socketId);
+            if (participantSocket) {
+              delete socketIdentity(participantSocket).matchId;
+              participantSocket.leave(id);
+            }
+          }
+        }
+        reconnectGrace.clearMatch(id);
+        activeMatches.delete(id);
+      })();
     },
   });
   const match: ActiveMatch = { id, mode, players: assigned, createdAt: Date.now(), runner };
@@ -336,6 +383,7 @@ app.get('/api/health', (_req, res) => {
     rankedDraftTimeoutMs: RANKED_DRAFT_TIMEOUT_MS,
     activeDrafts: draftRooms.size,
     activeMatches: activeMatches.size,
+    persistence: persistence.stats(),
   });
 });
 
@@ -361,56 +409,101 @@ const draftSweep = setInterval(() => {
 }, 1_000);
 draftSweep.unref();
 
-app.post('/api/auth/register', authRateLimit, (req, res) => {
+app.post('/api/auth/register', authRateLimit, async (req, res) => {
   const { username, email, password } = req.body as Record<string, unknown>;
   if (!isValidUsername(username)) return res.status(400).json({ error: 'Usuário deve ter 3-24 caracteres alfanuméricos/_.' });
   if (!isValidEmail(email)) return res.status(400).json({ error: 'E-mail inválido.' });
   if (!isValidPassword(password)) return res.status(400).json({ error: 'Senha deve ter 8-128 caracteres.' });
-  const nameKey = normalizeIdentity(username);
-  const emailKey = normalizeIdentity(email);
-  if (usersByName.has(nameKey)) return res.status(409).json({ error: 'Usuário já existe.' });
-  if (usersByEmail.has(emailKey)) return res.status(409).json({ error: 'E-mail já cadastrado.' });
-  const id = randomUUID();
-  const secured = hashPassword(password);
-  const user: DbUser = {
-    id,
-    username: username.trim(),
-    email: email.trim(),
-    passwordHash: secured.hash,
-    passwordSalt: secured.salt,
-    level: 1,
-  };
-  users.set(id, user);
-  usersByName.set(nameKey, id);
-  usersByEmail.set(emailKey, id);
-  return res.status(201).json({
-    user: { id, username: user.username, email: user.email, level: user.level },
-    token: sign(user),
-  });
+
+  try {
+    const secured = hashPassword(password);
+    const user = await persistence.createUser({
+      id: randomUUID(),
+      username,
+      email,
+      passwordHash: secured.hash,
+      passwordSalt: secured.salt,
+      level: 1,
+    });
+    const token = await issueToken(user);
+    return res.status(201).json({ user: accountPayload(user), token });
+  } catch (error) {
+    if (error instanceof DuplicateIdentityError) {
+      return res.status(409).json({ error: error.message });
+    }
+    console.error('[auth] falha no registro', error);
+    return res.status(500).json({ error: 'Falha ao criar conta.' });
+  }
 });
 
-app.post('/api/auth/login', authRateLimit, (req, res) => {
+app.post('/api/auth/login', authRateLimit, async (req, res) => {
   const { username, password } = req.body as Record<string, unknown>;
-  if (typeof username !== 'string' || typeof password !== 'string') return res.status(400).json({ error: 'Credenciais inválidas.' });
-  const id = usersByName.get(normalizeIdentity(username));
-  const user = id ? users.get(id) : undefined;
-  if (!user || !verifyPassword(password, user)) return res.status(401).json({ error: 'Usuário ou senha incorretos.' });
+  if (typeof username !== 'string' || typeof password !== 'string') {
+    return res.status(400).json({ error: 'Credenciais inválidas.' });
+  }
+
+  try {
+    const user = await persistence.findUserByUsername(username);
+    if (!user || !verifyPassword(password, user)) {
+      return res.status(401).json({ error: 'Usuário ou senha incorretos.' });
+    }
+    const token = await issueToken(user);
+    return res.json({ user: accountPayload(user), token });
+  } catch (error) {
+    console.error('[auth] falha no login', error);
+    return res.status(500).json({ error: 'Falha ao entrar.' });
+  }
+});
+
+app.post('/api/auth/logout', async (req, res) => {
+  const auth = await authenticateRequest(req);
+  if (!auth) return res.status(401).json({ error: 'Sessão inválida.' });
+  await persistence.revokeSession(auth.sessionId);
+  return res.status(204).end();
+});
+
+app.get('/api/me/profile', async (req, res) => {
+  const auth = await authenticateRequest(req);
+  if (!auth) return res.status(401).json({ error: 'Sessão inválida.' });
+  return res.json({ user: accountPayload(auth.user) });
+});
+
+app.get('/api/me/history', async (req, res) => {
+  const auth = await authenticateRequest(req);
+  if (!auth) return res.status(401).json({ error: 'Sessão inválida.' });
+  const requested = Number(req.query.limit ?? 20);
+  const limit = Number.isFinite(requested) ? requested : 20;
+  return res.json({ matches: await persistence.recentMatches(auth.user.id, limit) });
+});
+
+app.get('/api/leaderboard', async (req, res) => {
+  const requested = Number(req.query.limit ?? 50);
+  const limit = Number.isFinite(requested) ? requested : 50;
   return res.json({
-    user: { id: user.id, username: user.username, email: user.email, level: user.level },
-    token: sign(user),
+    mode: 'ranked5v5',
+    players: await persistence.leaderboard(limit),
   });
 });
 
-io.use((socket, next) => {
+io.use(async (socket, next) => {
   try {
     const token = socket.handshake.auth?.token;
     const clientContentVersion = socket.handshake.auth?.contentVersion;
     if (typeof token !== 'string' || token.length === 0) return next(new Error('unauthorized'));
     if (clientContentVersion !== CONTENT_VERSION) return next(new Error('content-version-mismatch'));
-    const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload & { userId?: string };
-    if (typeof decoded.userId !== 'string') return next(new Error('unauthorized'));
-    const user = users.get(decoded.userId);
+
+    const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload & {
+      userId?: string;
+      sid?: string;
+    };
+    if (typeof decoded.userId !== 'string' || typeof decoded.sid !== 'string') {
+      return next(new Error('unauthorized'));
+    }
+    const session = await persistence.findActiveSession(decoded.sid);
+    if (!session || session.userId !== decoded.userId) return next(new Error('unauthorized'));
+    const user = await persistence.findUserById(decoded.userId);
     if (!user) return next(new Error('unauthorized'));
+
     socket.data = { userId: user.id, username: user.username } satisfies AuthedSocketData;
     next();
   } catch {
@@ -622,5 +715,6 @@ httpServer.listen(PORT, () => {
   console.log('\n  ForgedMoba Server ' + SERVER_VERSION + ' em http://localhost:' + PORT);
   console.log('  Conteúdo: ' + CONTENT_VERSION + ' | simulação: ' + SIM_TICK_RATE + 'Hz');
   console.log('  CORS: ' + CORS_ORIGIN);
-  console.log('  Persistência: memória (ambiente de desenvolvimento)\n');
+  const storage = persistence.stats();
+  console.log('  Persistência: ' + storage.mode + (storage.durable ? ' (durável)' : ' (volátil)') + '\n');
 });
