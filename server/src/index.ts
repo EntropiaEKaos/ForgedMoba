@@ -29,7 +29,7 @@ import {
 
 const PORT = Number(process.env.PORT || 3001);
 const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:5173';
-const SERVER_VERSION = '3.0.0';
+const SERVER_VERSION = '4.0.0';
 const RECONNECT_GRACE_MS = 30_000;
 const RANKED_DRAFT_TIMEOUT_MS = 120_000;
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
